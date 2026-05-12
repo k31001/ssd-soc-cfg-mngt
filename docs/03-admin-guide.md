@@ -116,6 +116,190 @@ python3 tools/audit_access.py --org acme-ssd --output /tmp/access-drift.md
 
 (절대 destructive 한 force push 로 mainline history 를 다시 쓰지 않습니다. 외부에 이미 clone 된 SHA는 노출이라고 가정.)
 
+### 2.6+ Integration Tutorial — 통합 운영 한 사이클 (STEP-BY-STEP)
+
+> 매주 IP→Subsystem→Top 의 통합을 안전하게 굴리는 것이 형상관리 관리자의
+> 가장 핵심적 책임입니다. 본 튜토리얼은 한 주의 integration cycle 을
+> 시작부터 끝까지 명령으로 시연합니다. 소요 시간 약 **45분**.
+
+#### STEP A. 월요일 — 주간 진입 점검 (Monday Readiness)
+
+```bash
+# 1) Manifest drift report 확인 (manifest-bot 가 자동 생성한 issue)
+gh issue list --repo acme-ssd/ssd-soc-manifest --label drift --state open
+
+# 2) IP-level CI 실패율 상위 10개 추출
+gh api graphql -F query='{ ... }' 2>/dev/null || \
+echo "(가상 — 실제 운영에서는 GitHub Actions usage API 사용)"
+
+# 3) Long-running feature branch (>5일) 점검
+for r in $(gh repo list acme-ssd --limit 200 --json name --jq '.[].name'); do
+  gh api "repos/acme-ssd/$r/branches" --jq '.[] | select(.name != "main")' 2>/dev/null \
+    | jq -r --arg r "$r" '[$r, .name, .commit.commit.author.date] | @csv'
+done 2>/dev/null | head -10
+```
+
+#### STEP B. 화요일 — Manifest Bump PR 묶음 리뷰 (Integration Window 1)
+
+```bash
+# 1) auto label 의 PR 일괄 조회
+gh pr list --repo acme-ssd/ssd-soc-manifest --label auto,manifest-bump --state open
+
+# 2) 각 PR 의 CI 상태 확인
+for p in $(gh pr list --repo acme-ssd/ssd-soc-manifest --label auto --state open --json number --jq '.[].number'); do
+   gh pr checks --repo acme-ssd/ssd-soc-manifest $p
+done
+
+# 3) Green PR 은 batch 머지
+for p in $(gh pr list --repo acme-ssd/ssd-soc-manifest --label auto --state open --json number,checksState --jq '.[] | select(.checksState=="success") | .number'); do
+   gh pr merge --repo acme-ssd/ssd-soc-manifest $p --squash --auto
+done
+```
+
+**머지 후 즉시 확인**:
+```bash
+# Subsystem CI 가 manifest-resolve 단계에서 깨졌는지
+gh run list --repo acme-ssd/host_ss --workflow=subsystem-ci.yml --limit 3
+```
+
+#### STEP C. 수요일 — 통합 sim 실패 분류 (Triage)
+
+```bash
+# 어제 머지된 manifest PR 중 어느 IP 변경이 SS sim 을 깨뜨렸는지 추적
+gh run list --repo acme-ssd/host_ss --workflow=subsystem-ci.yml --status failure --limit 5 \
+   --json databaseId,headSha,event --jq '.[] | "\(.headSha[:8]) \(.event)"'
+
+# 깨진 SS sim 의 로그에서 어느 IP module 이 원인인지 추출
+gh run download <run-id> --repo acme-ssd/host_ss --pattern 'sim-log*' --dir /tmp/sim-logs
+grep -E 'Error|UVM_FATAL|MULTIDRIVEN' /tmp/sim-logs/*.log | head -10
+```
+
+**대응**:
+- IP 가 원인 → IP-owner 에 PR ping
+- Subsystem RTL 가 원인 → SS-owner 에 PR ping
+- Common interface 변경 → platform-team 에 escalation
+
+#### STEP D. 목요일 — Manifest Bump PR 묶음 리뷰 (Integration Window 2)
+
+월/수 사이에 누적된 IP tag 들의 batch. STEP B 와 동일 절차.
+
+#### STEP E. 금요일 — Top SoC RC Tag
+
+주간 통합이 안정화되면 Top SoC repo 에 release candidate tag:
+
+```bash
+cd /tmp/admin-workspace
+git clone -q git@github.com:acme-ssd/ssd-soc-top.git
+cd ssd-soc-top
+git checkout main && git pull -q
+
+# Top weekly CI 가 green 인지 최종 확인
+gh run list --workflow=top-soc-ci.yml --status success --limit 1
+
+# RC 태그
+git tag -a top-rc$(date +%V) -m "Weekly RC for ISO week $(date +%V)"
+git push -q origin top-rc$(date +%V)
+```
+
+#### STEP F. 매월 1회 — Subsystem Golden Tag 정리
+
+Subsystem CI 의 `golden-tag` job 이 자동 생성한 태그가 누적됩니다. 한 달 한 번 정리:
+
+```bash
+for ss in host_ss fcc_ss mem_ss cpu_ss sec_ss; do
+   echo "=== $ss ==="
+   gh api repos/acme-ssd/$ss/tags --jq '.[].name' | grep '^golden-' | sort -r | tail +20
+   # 21번째부터 archive (실제 삭제는 신중)
+done
+```
+
+#### STEP G. 분기 1회 — SKU 양산 동결 (가장 중요한 행사)
+
+```bash
+ROOT=/tmp/q3-MP
+mkdir -p $ROOT && cd $ROOT
+
+# 1) SKU manifest 로 fresh sync
+python3 /Users/euihyeokkwon/Works/soc-cfg-mngt/tools/repo_lite.py sync \
+   --manifest /path/to/sku-gen5-4tb.xml --workdir ws
+
+# 2) 동결 manifest 생성
+python3 /Users/euihyeokkwon/Works/soc-cfg-mngt/tools/release.py snapshot \
+   --src-manifest /path/to/sku-gen5-4tb.xml \
+   --workdir ws --sku gen5-4tb --release-id 2026Q3-MP \
+   --out release-2026Q3-MP.xml
+
+# 3) BOM 동시 산출
+python3 /Users/euihyeokkwon/Works/soc-cfg-mngt/tools/bom.py \
+   --manifest /path/to/sku-gen5-4tb.xml --workdir ws --output BOM-2026Q3-MP.md
+
+# 4) Top repo 에 release tag + artifact commit
+cd ws/top
+git tag -a sku-gen5-4tb-2026Q3-MP -m "MP release for Q3 2026"
+git push origin sku-gen5-4tb-2026Q3-MP
+# CI 의 release-snapshot job 이 자동으로 release artifact 디렉터리에 commit
+```
+
+**산출물 3종 세트**:
+- `release-<id>.xml` — 모든 component 의 SHA-pinned 동결 manifest
+- `BOM-<id>.md` — IP/owner/version/status 한눈 표
+- Top repo 의 release tag (불변)
+
+이 3개가 PD/Foundry sign-off 의 single source.
+
+#### STEP H. Integration 사고 대응 — 잘못된 IP tag 가 mainline 으로 흘러간 경우
+
+**상황**: IP `ip-pcie_ctrl` 의 v2.5.0 이 mainline manifest 에 머지되었는데, top SoC weekly CI 에서 광범위한 회귀 발생.
+
+```bash
+# 1) Manifest 의 해당 항목을 이전 안정 tag 로 즉시 rollback PR
+cd /tmp/admin-workspace
+git clone -q git@github.com:acme-ssd/ssd-soc-manifest.git
+cd ssd-soc-manifest
+git checkout -b rollback/pcie_ctrl-v2.5.0
+python3 /Users/euihyeokkwon/Works/soc-cfg-mngt/tools/manifest_bump.py bump \
+   --manifest default.xml --name ip-pcie_ctrl --revision v2.4.0
+git -c user.email=admin@acme -c user.name=admin \
+   commit -aq -m "rollback: ip-pcie_ctrl v2.5.0 → v2.4.0 (top regression #1234)"
+git push -u origin rollback/pcie_ctrl-v2.5.0
+gh pr create --fill --label urgent,rollback
+
+# 2) IP-owner 와 sync — 무엇이 원인인지, 다음 PR 에 fix 포함 요청
+
+# 3) Top CI 정상 복귀 확인 후 PR 머지
+# 4) 사고 회고 — verif-framework 회귀 셋에 해당 시나리오 추가 요청
+```
+
+**원칙**: integration 사고는 **manifest revert** 가 가장 빠르고 가역적. IP repo 의 history 손대지 않음.
+
+#### STEP I. 운영 신호 모니터링 (Daily KPI dashboard)
+
+매일 자동 메일/Slack 으로 발송하는 4개 지표:
+
+| 지표 | 임계치 | 액션 |
+|---|---|---|
+| Manifest auto-PR 머지율 | < 90% 시 알림 | 실패 PR 분류, IP-owner ping |
+| IP CI 평균 시간 | > 10분 시 알림 | reusable workflow 캐시 점검 |
+| Top weekly CI 회귀 횟수 | > 2회/주 시 알림 | verif 셋 강화 요청 |
+| `golden-tag` 누적 수 | repo 당 > 30 시 알림 | archive |
+
+#### STEP J. 다음 주 준비
+
+```bash
+# 다음 주 integration window 에 들어올 IP tag 미리 점검
+gh api graphql -F query='
+{ organization(login: "acme-ssd") {
+    repositories(first: 30) {
+      nodes { name refs(first: 10, refPrefix: "refs/tags/", orderBy:{field:TAG_COMMIT_DATE, direction:DESC}) {
+        nodes { name target { ... on Tag { tagger { date } } } }
+      }}}}}'  2>/dev/null | head -20
+
+# 다음 주 일정 미리 공지
+echo "Integration window: Tue/Thu 14:00 KST. Top RC tag: Friday 18:00 KST"
+```
+
+---
+
 ### 2.7 PDK / 대용량 자산 LFS 용량 관리
 ```bash
 gh api repos/acme-ssd/pdk-views/git/lfs/usage

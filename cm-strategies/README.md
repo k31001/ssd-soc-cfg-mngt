@@ -12,6 +12,17 @@
 | 03 | **Google `repo` + manifest** | [`03-repo-manifest/`](03-repo-manifest/) | `repo init/sync`, manifest.xml | SKU별 분기 우수, 100+ 멀티레포 표준 | 외부 도구 의존, macOS/Win 어색 |
 | 04 | **Hybrid Monorepo + Subtree** | [`04-subtree/`](04-subtree/) | `git subtree pull/push`, vendor branch | 외부 IP 흡수 깔끔 | 양방향 동기화 복잡, 히스토리 비대 |
 
+## 튜토리얼 (Step-by-Step)
+
+각 전략별로 **개발자 / 관리자 관점의 튜토리얼** 이 준비되어 있습니다. 모두 로컬에서 그대로 재현 가능.
+
+| 전략 | Developer Tutorial | Admin Tutorial |
+|---|---|---|
+| 01 Monorepo | [DEVELOPER-TUTORIAL.md](01-monorepo/DEVELOPER-TUTORIAL.md) | [ADMIN-TUTORIAL.md](01-monorepo/ADMIN-TUTORIAL.md) |
+| 02 Submodule | [DEVELOPER-TUTORIAL.md](02-submodule/DEVELOPER-TUTORIAL.md) | [ADMIN-TUTORIAL.md](02-submodule/ADMIN-TUTORIAL.md) |
+| 03 Repo+Manifest | [DEVELOPER-TUTORIAL.md](03-repo-manifest/DEVELOPER-TUTORIAL.md) | [ADMIN-TUTORIAL.md](03-repo-manifest/ADMIN-TUTORIAL.md) |
+| 04 Subtree | [DEVELOPER-TUTORIAL.md](04-subtree/DEVELOPER-TUTORIAL.md) | [ADMIN-TUTORIAL.md](04-subtree/ADMIN-TUTORIAL.md) |
+
 ## 비교 매트릭스 (요약)
 
 | 항목 | Monorepo | Submodule | repo+manifest | Subtree |

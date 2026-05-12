@@ -197,6 +197,129 @@ repo upload --current-branch --topic refactor/new-axi-bus
 
 ---
 
+## 3.7 Integration Tutorial — 내 IP를 SoC 에 합치는 일 (STEP-BY-STEP)
+
+> **상황**: 본인의 IP 가 IP-CI 는 모두 통과. 이제 **Subsystem** 과 **Top SoC** 통합에서 깨지지 않게 만들고 검증하는 것이 다음 책임입니다.
+> 본 튜토리얼을 따라 가면 "내 IP 가 회사 SoC 안에서 정상 동작" 까지의 전체 흐름을 직접 체험합니다. 소요 시간 약 **40분**.
+
+### STEP A. Integration Contract 확인 — 다른 IP가 나를 어떻게 호출하는가
+
+```bash
+cd /tmp/ssd-soc-recommended/work/checkout/ip/pcie_phy   # 또는 사내 워크스페이스
+cat cfg/pcie_phy.ip.yaml | head -25
+# - parameters, bus, clocks, resets 가 "내 IP 의 외부 계약(contract)"
+```
+
+다른 IP/Subsystem 이 내 IP 를 부를 때 가정하는 것:
+- 인터페이스 (`bus`) — AXI 라면 master/slave 모드, 비트폭
+- 클록/리셋 도메인 — 다른 도메인이면 CDC 필요
+- 파라미터의 default — SKU 별로 바뀌어도 모두에서 elaborate 가능해야 함
+
+**Tip**: contract 가 바뀌면 (포트 추가/제거, 파라미터 의미 변경) `version` 의 MAJOR 를 올려야 합니다 (semver). PR 본문에 **breaking change** 라벨 명시.
+
+### STEP B. Subsystem Integration Sim 로컬 실행
+
+내 IP 단독 sim 통과는 시작에 불과. Subsystem 통합 환경에서 검증:
+
+```bash
+cd /tmp/ssd-soc-recommended/work/checkout/subsystems/host_ss
+ls
+# cfg  doc  rtl  sim
+# - rtl/host_ss.sv : 5개 host IP 인스턴스화
+# - cfg/host_ss.ss.yaml : member IPs
+
+# Subsystem 통합 sim (Verilator 가 있으면)
+make -C ../../ssd_soc sim TOP=host_ss 2>&1 | tail || echo "(skip: verilator missing)"
+```
+
+**기대 결과**: 내 IP 변경이 다른 host_ss IP 와 호환되어 elaborate + smoke 통과.
+실패 시 — STEP C 로.
+
+### STEP C. Integration 깨짐 디버깅 — 자주 보는 4가지
+
+| 증상 | 진단 명령 | 해결 |
+|---|---|---|
+| `module not found` | `grep -n include subsystems/host_ss/rtl/host_ss.sv` | `ssd_soc/scripts/compile.f` 의 file 순서 |
+| `port direction mismatch` | `git diff main...HEAD ip/<me>/cfg/*.ip.yaml` | parameter 의미 변경 시 SS rtl 도 갱신 PR |
+| `multiple drivers on signal` | `verilator -Wall ... | grep MULTIDRIVEN` | tie-off 충돌 — Subsystem wrapper 가 자기 영역만 구동 |
+| `CDC violation` | `cat ip/<me>/cfg/waivers.yaml` | 클록 도메인 횡단점에 sync 셀 추가 |
+
+### STEP D. Top SoC Build 로컬 실행 (전체 elaborate)
+
+```bash
+cd /tmp/ssd-soc-recommended/work/checkout
+make elab 2>&1 | tail || echo "(skip: verilator missing)"
+```
+
+Top elaborate 만 통과해도 SoC 통합 관점에서는 **99% 의 인터페이스 호환성** 검증됩니다. 본격 sim/coverage 는 weekly Top CI 가 담당.
+
+### STEP E. Subsystem PR 흐름에 동반 변경 만들기
+
+내 IP 변경이 Subsystem RTL 갱신을 요구하는 경우 (예: 포트 추가):
+
+```bash
+# 1) IP repo 의 PR — 새 포트 추가, ip.yaml version MAJOR bump
+cd ip/pcie_phy
+git checkout -b feature/add-debug-port
+# ...edit rtl/, cfg/*.ip.yaml...
+git commit -am "pcie_phy: expose debug port (v1.0.0 breaking)"
+git push -u origin feature/add-debug-port
+
+# 2) Subsystem repo 의 PR — host_ss.sv 가 새 포트를 연결
+cd ../../subsystems/host_ss
+git checkout -b feature/wire-pcie_phy-debug
+${EDITOR} rtl/host_ss.sv     # 새 포트 wire 추가
+git commit -am "host_ss: wire pcie_phy debug port"
+git push -u origin feature/wire-pcie_phy-debug
+```
+
+**중요**: 두 PR 은 **같은 topic** (`repo upload --topic=...`) 으로 묶거나, IP PR 본문에 Subsystem PR 링크 명시. Subsystem PR 머지는 IP tag 가 push 된 *후* 가 자연스러운 순서.
+
+### STEP F. Integration Window 참여
+
+매주 화/목 manifest-bot 이 만드는 PR 묶음에 본인 IP 의 새 tag 가 포함됩니다.
+
+```bash
+# manifest PR 묶음 확인 (가상 — 실제는 GitHub UI)
+gh pr list --repo acme-ssd/ssd-soc-manifest --label manifest-bump --state open | head
+
+# 내 IP 의 PR 이 묶여있다면 → manifest CI 결과 확인 → 통과 시 머지 권한자 sign-off
+```
+
+**개발자가 할 일**: manifest PR 의 manifest-resolve / integration-sim 결과에 본인 IP 가 원인인 실패가 있으면 즉시 IP repo 에서 hotfix.
+
+### STEP G. Cross-Subsystem Integration (CPU ↔ Host)
+
+대형 SoC 에서는 한 IP 변경이 다른 subsystem 까지 영향:
+
+```
+host_ss/pcie_ctrl ──── 변경
+                           │
+                           ▼
+   cpu_ss/irq_ctrl 의 IRQ 매핑 변경 필요  ← 다른 subsystem
+```
+
+이 경우 책임:
+1. **IP-owner** = 변경 detect (자기 인터페이스가 cross-SS dependent 일 때).
+2. PR 본문에 **"Affects: host_ss, cpu_ss"** 명시.
+3. 두 subsystem owner 모두 reviewer.
+4. Top SoC weekly CI 통과 확인 후에 본인 IP tag 푸시.
+
+### STEP H. Integration 회귀 추적
+
+내 IP 가 어느 시점부터 SoC 통합 sim 을 깨뜨렸는지 추적:
+
+```bash
+# manifest 의 어느 bump 부터 fail 시작했는지
+cd /tmp/ssd-soc-recommended/work/manifest
+git log --oneline -20    # manifest PR 머지 히스토리
+
+# IP 단독 sim 은 통과하지만 SoC sim 에서 fail → integration 회귀
+# → verif-framework repo 의 회귀 셋에 본 시나리오 추가 요청
+```
+
+---
+
 ## 4. 안티패턴 (절대 하지 마세요)
 
 | 안티패턴 | 왜 나쁜가 | 대안 |
