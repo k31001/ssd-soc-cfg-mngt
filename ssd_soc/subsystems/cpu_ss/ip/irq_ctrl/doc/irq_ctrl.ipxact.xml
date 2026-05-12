@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  IP-XACT 1685-2014 component for irq_ctrl
+  irq_ctrl용 IP-XACT 1685-2014 component
   Vendor : ssd-soc
   Library: cpu_ss
   Name   : irq_ctrl
   Version: 1.0.0
-  Scope  : This file declares the SFR map only (memoryMaps); ports/bus
-           interfaces are intentionally minimal — full bus-interface
-           declarations are added by the SoC integration package.
+  Scope  : 본 파일은 SFR map만 선언한다 (memoryMaps). ports/bus interface는
+           최소화되어 있으며, 전체 bus-interface 선언은 SoC integration
+           package에서 추가한다.
 -->
 <ipxact:component xmlns:ipxact="http://www.accellera.org/XMLSchema/IPXACT/1685-2014"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -23,7 +23,7 @@
   <ipxact:memoryMaps>
     <ipxact:memoryMap>
       <ipxact:name>regs</ipxact:name>
-      <ipxact:description>APB-mapped SFRs of irq_ctrl (4 KiB window).</ipxact:description>
+      <ipxact:description>irq_ctrl의 APB-mapped SFR (4 KiB window).</ipxact:description>
 
       <ipxact:addressBlock>
         <ipxact:name>irq_ctrl_regs</ipxact:name>
@@ -36,7 +36,7 @@
         <!-- ───────── PRIORITY[0] (reserved, RO=0) ───────── -->
         <ipxact:register>
           <ipxact:name>PRIORITY_0</ipxact:name>
-          <ipxact:description>Reserved source-0 priority (always 0).</ipxact:description>
+          <ipxact:description>예약된 source-0 priority (항상 0).</ipxact:description>
           <ipxact:addressOffset>0x000</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
           <ipxact:access>read-only</ipxact:access>
@@ -59,11 +59,11 @@
         </ipxact:register>
 
         <!-- ───────── PRIORITY[1..31] (RW, 4-bit) ─────────
-             Encoded as an explicit array via dim+addressOffset increments.
-             Tools that support dim/dimensions read this as a 31-entry array. -->
+             dim+addressOffset 증가로 명시적 array를 인코딩. dim/dimensions를
+             지원하는 tool은 본 register를 31-entry array로 해석한다. -->
         <ipxact:register>
           <ipxact:name>PRIORITY</ipxact:name>
-          <ipxact:description>Per-source priority. 0=disabled, 1..15=active.</ipxact:description>
+          <ipxact:description>source별 priority. 0=disabled, 1..15=active.</ipxact:description>
           <ipxact:dim>31</ipxact:dim>
           <ipxact:addressOffset>0x004</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
@@ -74,7 +74,7 @@
           </ipxact:reset>
           <ipxact:field>
             <ipxact:name>VALUE</ipxact:name>
-            <ipxact:description>Priority value for source N (PRIORITY[N], N=1..31).</ipxact:description>
+            <ipxact:description>source N의 priority 값 (PRIORITY[N], N=1..31).</ipxact:description>
             <ipxact:bitOffset>0</ipxact:bitOffset>
             <ipxact:bitWidth>4</ipxact:bitWidth>
             <ipxact:access>read-write</ipxact:access>
@@ -90,7 +90,7 @@
         <!-- ───────── PENDING (RO, 32-bit) ───────── -->
         <ipxact:register>
           <ipxact:name>PENDING</ipxact:name>
-          <ipxact:description>Per-source pending. Bit i = source i pending. Bit 0 reserved (=0).</ipxact:description>
+          <ipxact:description>source별 pending. 비트 i = source i pending. 비트 0은 예약 (=0).</ipxact:description>
           <ipxact:addressOffset>0x100</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
           <ipxact:access>read-only</ipxact:access>
@@ -115,7 +115,7 @@
         <!-- ───────── PENDING_CLEAR (W1C) ───────── -->
         <ipxact:register>
           <ipxact:name>PENDING_CLEAR</ipxact:name>
-          <ipxact:description>Write 1 to clear pending bit (edge sources only). Reads as 0.</ipxact:description>
+          <ipxact:description>1 write 시 pending 비트 clear (edge source 전용). Read는 0.</ipxact:description>
           <ipxact:addressOffset>0x104</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
           <ipxact:access>write-only</ipxact:access>
@@ -141,7 +141,7 @@
         <!-- ───────── ENABLE (RW) ───────── -->
         <ipxact:register>
           <ipxact:name>ENABLE</ipxact:name>
-          <ipxact:description>Per-source enable. Bit i = source i unmasked. Bit 0 reserved (=0).</ipxact:description>
+          <ipxact:description>source별 enable. 비트 i = source i 해제. 비트 0은 예약 (=0).</ipxact:description>
           <ipxact:addressOffset>0x200</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
           <ipxact:access>read-write</ipxact:access>
@@ -166,7 +166,7 @@
         <!-- ───────── THRESHOLD (RW, 4-bit) ───────── -->
         <ipxact:register>
           <ipxact:name>THRESHOLD</ipxact:name>
-          <ipxact:description>Global priority threshold. Source fires iff priority &gt; threshold.</ipxact:description>
+          <ipxact:description>전역 priority threshold. source는 priority &gt; threshold일 때만 fire.</ipxact:description>
           <ipxact:addressOffset>0x300</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
           <ipxact:access>read-write</ipxact:access>
@@ -192,9 +192,9 @@
         <ipxact:register>
           <ipxact:name>CLAIM_COMPLETE</ipxact:name>
           <ipxact:description>
-            Read: returns winning source ID and atomically clears its pending
-            (edge sources only). Write: completion acknowledgement (informational
-            in v1.0; reserved for multi-context gating in future).
+            Read: winning source ID 반환 및 해당 source pending atomic clear
+            (edge source 전용). Write: 완료 ack (v1.0에서는 informational;
+            향후 multi-context gating용으로 예약).
           </ipxact:description>
           <ipxact:addressOffset>0x304</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
@@ -205,7 +205,7 @@
           </ipxact:reset>
           <ipxact:field>
             <ipxact:name>ID</ipxact:name>
-            <ipxact:description>Interrupt source ID (1..31). 0 = no pending eligible source.</ipxact:description>
+            <ipxact:description>Interrupt source ID (1..31). 0 = eligible pending source 없음.</ipxact:description>
             <ipxact:bitOffset>0</ipxact:bitOffset>
             <ipxact:bitWidth>5</ipxact:bitWidth>
             <ipxact:access>read-write</ipxact:access>
@@ -222,7 +222,7 @@
         <!-- ───────── IP_ID (RO constant) ───────── -->
         <ipxact:register>
           <ipxact:name>IP_ID</ipxact:name>
-          <ipxact:description>IP identifier constant ("IRC\1" = 0x49524301).</ipxact:description>
+          <ipxact:description>IP 식별자 상수 ("IRC\1" = 0x49524301).</ipxact:description>
           <ipxact:addressOffset>0x308</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
           <ipxact:access>read-only</ipxact:access>
@@ -247,7 +247,7 @@
         <!-- ───────── IP_VERSION (RO constant) ───────── -->
         <ipxact:register>
           <ipxact:name>IP_VERSION</ipxact:name>
-          <ipxact:description>Version constant: {major[15:8], minor[7:0], patch[7:0]} = 1.0.0.</ipxact:description>
+          <ipxact:description>Version 상수: {major[15:8], minor[7:0], patch[7:0]} = 1.0.0.</ipxact:description>
           <ipxact:addressOffset>0x30C</ipxact:addressOffset>
           <ipxact:size>32</ipxact:size>
           <ipxact:access>read-only</ipxact:access>

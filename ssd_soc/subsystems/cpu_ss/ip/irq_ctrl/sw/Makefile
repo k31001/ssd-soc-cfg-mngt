@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-# Host-side smoke build for the irq_ctrl HAL.
+# irq_ctrl HAL용 host-side smoke build.
 #
-#   make           — build the HAL into a static archive + host smoke test
-#   make test      — build and run the host smoke test
+#   make           — HAL을 static archive로 빌드 + host smoke test 생성
+#   make test      — host smoke test 빌드 및 실행
 #   make clean
 
 CC      ?= cc
@@ -25,8 +25,8 @@ irq_ctrl_hal.o: irq_ctrl_hal.c irq_ctrl_hal.h
 # The host test overrides IRQ_CTRL_BASE before including the header, so it
 # does NOT link the .o (which compiled with the default base). It compiles
 # the .c directly with the shadow buffer as the base.
-# test_hal_host.c #include's irq_ctrl_hal.c directly so the HAL picks up
-# the test's shadow-buffer IRQ_CTRL_BASE override.
+# test_hal_host.c가 irq_ctrl_hal.c를 직접 #include하여 test의
+# shadow-buffer IRQ_CTRL_BASE override가 HAL에 적용되도록 한다.
 $(TEST): test_hal_host.c irq_ctrl_hal.c irq_ctrl_hal.h
 	$(CC) $(CFLAGS) -I. test_hal_host.c -o $@
 

@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-/* Host-side smoke test for irq_ctrl_hal.
+/* irq_ctrl_hal용 host-side smoke test.
  *
- * Replaces the volatile MMIO region with a 4 KiB shadow buffer so the
- * HAL can be exercised on the build host without target hardware.
- * Validates: probe, init register sequence, set/get round-trips,
- * clear-pending bitmask, and claim/complete read/write encoding.
+ * volatile MMIO 영역을 4 KiB shadow buffer로 대체하여 타깃 hardware
+ * 없이 빌드 host에서 HAL을 검증할 수 있도록 한다.
+ * 검증 항목: probe, init register sequence, set/get round-trip,
+ * clear-pending bitmask, claim/complete read/write 인코딩.
  */
 
 #include <stdio.h>
@@ -18,7 +18,7 @@ static uint8_t g_mmio[4096];
 
 #define IRQ_CTRL_BASE  ((uintptr_t)g_mmio)
 #include "irq_ctrl_hal.h"
-/* Compile HAL implementation in-place so it picks up the overridden base. */
+/* HAL 구현을 in-place로 compile하여 override된 base 주소를 사용하도록 한다. */
 #include "irq_ctrl_hal.c"
 
 static int g_fail = 0;

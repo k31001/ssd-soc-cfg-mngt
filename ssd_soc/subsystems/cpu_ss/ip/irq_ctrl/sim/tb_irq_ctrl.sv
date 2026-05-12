@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 // Testbench: tb_irq_ctrl
-// Self-checking testbench for irq_ctrl IP.
+// irq_ctrl IP용 self-checking testbench.
 //
 // Coverage:
-//   T1  reset state                       — all regs zero, no eip
-//   T2  IP_ID / IP_VERSION readback       — RO regs return constants
-//   T3  priority/enable RW                — write-then-read consistency
-//   T4  level source                      — pending tracks line; eip rises/falls
-//   T5  edge source rising-edge capture   — pending sticks after deassert
-//   T6  threshold gating                  — eip suppressed below threshold
-//   T7  priority arbitration              — highest priority wins; tie → lowest ID
-//   T8  claim atomically clears pending   — edge source cleared by claim read
-//   T9  PENDING_CLEAR (W1C) edge          — software-cleared edge bit
-//   T10 pslverr on unmapped address       — error response
-//   T11 pslverr on RO write               — write to PENDING/IP_ID/IP_VERSION
+//   T1  reset 상태                         — 모든 register 0, eip 없음
+//   T2  IP_ID / IP_VERSION readback        — RO register가 상수 반환
+//   T3  priority/enable RW                 — write-then-read 일관성
+//   T4  level source                       — pending이 line 추적; eip rise/fall
+//   T5  edge source rising-edge capture    — deassert 후에도 pending 유지
+//   T6  threshold gating                   — threshold 이하 priority의 eip 차단
+//   T7  priority arbitration               — 최고 priority 우승; tie → 최소 ID
+//   T8  claim atomically clears pending    — claim read로 edge source clear
+//   T9  PENDING_CLEAR (W1C) edge           — SW가 clear한 edge 비트
+//   T10 pslverr on 미매핑 주소             — 에러 응답
+//   T11 pslverr on RO write                — PENDING/IP_ID/IP_VERSION write
 
 `timescale 1ns/1ps
 

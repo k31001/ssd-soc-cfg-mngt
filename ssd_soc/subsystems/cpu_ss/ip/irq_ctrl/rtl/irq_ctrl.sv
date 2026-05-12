@@ -1,31 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
-// IP: irq_ctrl  —  PLIC-style Platform-Level Interrupt Controller (single hart, single context)
+// IP: irq_ctrl  —  PLIC 계열 Platform-Level Interrupt Controller (single hart, single context)
 //
-// Synthesizable, APB-slave-attached interrupt aggregator.
-// - (NUM_IRQ-1) external sources (source 0 is reserved per PLIC convention).
-// - Per-source 4-bit priority (0 = disabled-by-priority, 1..15 = active).
-// - Per-source enable bit.
-// - Edge-or-level configurable detection per source (compile-time via EDGE_MASK).
-// - Threshold register: only sources with priority > threshold can fire eip.
-// - Claim/complete handshake: read CLAIM_COMPLETE returns winning source ID and
-//   atomically clears its pending state (edge sources); write to CLAIM_COMPLETE
-//   acknowledges completion (currently informational — no gating).
+// 합성 가능하며 APB-slave에 연결되는 interrupt aggregator.
+// - (NUM_IRQ-1)개의 외부 source (source 0은 PLIC 관례에 따라 예약).
+// - source별 4-bit priority (0 = priority 기준 비활성, 1..15 = 활성).
+// - source별 enable 비트.
+// - source별 edge/level 감지 모드 (compile-time EDGE_MASK).
+// - Threshold register: priority > threshold인 source만 eip를 fire.
+// - Claim/complete handshake: CLAIM_COMPLETE read는 winning source ID 반환 및
+//   해당 pending atomic clear (edge source 전용); write는 완료 ack
+//   (현재는 informational — gating 없음).
 
 `ifndef IRQ_CTRL_SV
 `define IRQ_CTRL_SV
 
 module irq_ctrl #(
-  parameter int unsigned NUM_IRQ   = 32,    // includes reserved source 0
+  parameter int unsigned NUM_IRQ   = 32,    // 예약된 source 0 포함
   parameter int unsigned PRIO_W    = 4,
-  // Per-source edge detection mask. Bit i = 1 => source i is edge-triggered
-  // (rising edge sets pending; pending stays until claim or W1C clears it).
-  // Bit i = 0 => level-triggered (pending follows irq_src_i[i]).
+  // source별 edge 감지 mask. 비트 i = 1 => source i가 edge-triggered
+  // (rising edge에서 pending set; claim 또는 W1C로 clear될 때까지 유지).
+  // 비트 i = 0 => level-triggered (pending이 irq_src_i[i]를 추적).
   parameter logic [NUM_IRQ-1:0] EDGE_MASK = '0
 ) (
   input  logic                       clk,
   input  logic                       rst_n,
 
-  // APB slave (flattened — interface-version provided as wrapper, see below)
+  // APB slave (flattened — interface 버전은 아래 wrapper로 제공)
   input  logic [11:0]                paddr,
   input  logic                       psel,
   input  logic                       penable,
@@ -35,13 +35,13 @@ module irq_ctrl #(
   output logic                       pready,
   output logic                       pslverr,
 
-  // Interrupt sources (source 0 ignored)
+  // Interrupt source (source 0 무시)
   input  logic [NUM_IRQ-1:0]         irq_src_i,
 
-  // CPU-facing external interrupt pending (active high, level)
+  // CPU에 전달되는 external interrupt pending (active high, level)
   output logic                       eip_o,
 
-  // Currently-winning source ID (informational; CPU normally reads CLAIM)
+  // 현재 winning source ID (informational; CPU는 보통 CLAIM을 read)
   output logic [$clog2(NUM_IRQ)-1:0] eip_id_o
 );
 
@@ -66,7 +66,7 @@ module irq_ctrl #(
   logic [NUM_IRQ-1:0]  enable_q;
   logic [NUM_IRQ-1:0]  pending_q;
   logic [PRIO_W-1:0]   threshold_q;
-  logic [NUM_IRQ-1:0]  irq_src_d;       // for edge detection
+  logic [NUM_IRQ-1:0]  irq_src_d;       // edge 검출용
 
   // ───────────────────────── APB handshake helpers ─────────────────────────
   wire access_phase = psel & penable;
@@ -75,7 +75,7 @@ module irq_ctrl #(
   wire is_prio_range = (paddr <= OFF_PRIO_LIMIT);
   wire [4:0] prio_idx = paddr[6:2];
 
-  // Forward-declared (used in pending logic)
+  // Forward 선언 (pending logic에서 사용)
   logic              claim_rd_fire;
   logic [ID_W-1:0]   claim_id;
 
@@ -115,16 +115,16 @@ module irq_ctrl #(
 
       for (int i = 0; i < NUM_IRQ; i++) begin
         if (i == 0) begin
-          pending_q[0] <= 1'b0;                 // reserved
+          pending_q[0] <= 1'b0;                 // 예약 source
         end else if (EDGE_MASK[i]) begin
           if (irq_src_i[i] & ~irq_src_d[i])
-            pending_q[i] <= 1'b1;               // set on rising edge
+            pending_q[i] <= 1'b1;               // rising edge에서 set
         end else begin
-          pending_q[i] <= irq_src_i[i];         // level-track
+          pending_q[i] <= irq_src_i[i];         // level 추적
         end
       end
 
-      // W1C from SW (only effective for edge sources)
+      // SW의 W1C (edge source에만 유효)
       if (wr_access && paddr == OFF_PENDING_CLEAR) begin
         for (int i = 0; i < NUM_IRQ; i++) begin
           if (i != 0 && pwdata[i] && EDGE_MASK[i])
@@ -132,7 +132,7 @@ module irq_ctrl #(
         end
       end
 
-      // Atomic clear on claim (edge sources only)
+      // Claim 시 atomic clear (edge source 전용)
       if (claim_rd_fire && claim_id != '0 && EDGE_MASK[claim_id])
         pending_q[claim_id] <= 1'b0;
     end
@@ -145,7 +145,7 @@ module irq_ctrl #(
     unique case (1'b1)
       is_prio_range:                       rdata_c = {{(32-PRIO_W){1'b0}}, priority_q[prio_idx]};
       (paddr == OFF_PENDING):              rdata_c = pending_q;
-      (paddr == OFF_PENDING_CLEAR):        rdata_c = 32'h0;       // W1C — read 0
+      (paddr == OFF_PENDING_CLEAR):        rdata_c = 32'h0;       // W1C — read는 0
       (paddr == OFF_ENABLE):               rdata_c = enable_q;
       (paddr == OFF_THRESHOLD):            rdata_c = {{(32-PRIO_W){1'b0}}, threshold_q};
       (paddr == OFF_CLAIM_COMPLETE):       rdata_c = {{(32-ID_W){1'b0}}, best_id};
@@ -157,7 +157,7 @@ module irq_ctrl #(
 
   assign claim_rd_fire = rd_access && (paddr == OFF_CLAIM_COMPLETE);
 
-  // Address-decode error & writes to RO
+  // 주소 decode 에러 & RO write 검출
   logic addr_valid;
   always_comb begin
     addr_valid = is_prio_range
@@ -184,7 +184,7 @@ module irq_ctrl #(
       threshold_q <= '0;
       for (int i = 0; i < NUM_IRQ; i++) priority_q[i] <= '0;
     end else begin
-      priority_q[0] <= '0;  // source 0 priority pinned
+      priority_q[0] <= '0;  // source 0 priority는 0으로 고정
 
       if (wr_access) begin
         if (is_prio_range && prio_idx != 0) begin
@@ -195,21 +195,21 @@ module irq_ctrl #(
         end else if (paddr == OFF_THRESHOLD) begin
           threshold_q <= pwdata[PRIO_W-1:0];
         end
-        // CLAIM_COMPLETE write is informational (no gating in this revision).
+        // CLAIM_COMPLETE write는 informational (본 revision에는 gating 없음).
       end
     end
   end
 
   // ───────────────────────── APB outputs ─────────────────────────
   assign prdata  = rd_access ? rdata_c : 32'h0;
-  assign pready  = access_phase;       // 2-cycle access; ready in ACCESS phase
+  assign pready  = access_phase;       // 2-cycle access; ACCESS phase에 ready
   assign pslverr = access_phase & (~addr_valid | wr_to_ro);
 
 endmodule
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Thin wrapper that adapts the project-wide `apb_if` to the flat-port core.
-// Existing instantiations using `apb_if.slave` continue to compile.
+// 프로젝트 공통 `apb_if`를 flat-port core에 연결하는 얇은 wrapper.
+// `apb_if.slave`를 사용하는 기존 instantiation은 그대로 compile된다.
 // ─────────────────────────────────────────────────────────────────────────────
 module irq_ctrl_apbif #(
   parameter int unsigned NUM_IRQ = 32,

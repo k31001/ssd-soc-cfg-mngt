@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-/* irq_ctrl HAL — implementation for v1.0.0 controller. */
+/* irq_ctrl HAL — v1.0.0 controller용 구현. */
 
 #include "irq_ctrl_hal.h"
 
@@ -23,7 +23,7 @@ irq_ctrl_probe(void)
 void
 irq_ctrl_init(void)
 {
-    irq_ctrl_write32(IRQ_CTRL_REG_THRESHOLD, IRQ_CTRL_PRIO_MAX);   /* mask all */
+    irq_ctrl_write32(IRQ_CTRL_REG_THRESHOLD, IRQ_CTRL_PRIO_MAX);   /* 모두 mask */
     irq_ctrl_write32(IRQ_CTRL_REG_ENABLE,    0u);
 
     for (uint32_t i = 1; i < IC_NUM; i++) {
