@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  IP-XACT 1685-2014 component for irq_ctrl
+  Vendor : ssd-soc
+  Library: cpu_ss
+  Name   : irq_ctrl
+  Version: 1.0.0
+  Scope  : This file declares the SFR map only (memoryMaps); ports/bus
+           interfaces are intentionally minimal — full bus-interface
+           declarations are added by the SoC integration package.
+-->
+<ipxact:component xmlns:ipxact="http://www.accellera.org/XMLSchema/IPXACT/1685-2014"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://www.accellera.org/XMLSchema/IPXACT/1685-2014
+                                      http://www.accellera.org/XMLSchema/IPXACT/1685-2014/index.xsd">
+
+  <ipxact:vendor>ssd-soc</ipxact:vendor>
+  <ipxact:library>cpu_ss</ipxact:library>
+  <ipxact:name>irq_ctrl</ipxact:name>
+  <ipxact:version>1.0.0</ipxact:version>
+
+  <!-- ============================ Memory map ============================ -->
+  <ipxact:memoryMaps>
+    <ipxact:memoryMap>
+      <ipxact:name>regs</ipxact:name>
+      <ipxact:description>APB-mapped SFRs of irq_ctrl (4 KiB window).</ipxact:description>
+
+      <ipxact:addressBlock>
+        <ipxact:name>irq_ctrl_regs</ipxact:name>
+        <ipxact:baseAddress>0x0</ipxact:baseAddress>
+        <ipxact:range>4096</ipxact:range>
+        <ipxact:width>32</ipxact:width>
+        <ipxact:usage>register</ipxact:usage>
+        <ipxact:access>read-write</ipxact:access>
+
+        <!-- ───────── PRIORITY[0] (reserved, RO=0) ───────── -->
+        <ipxact:register>
+          <ipxact:name>PRIORITY_0</ipxact:name>
+          <ipxact:description>Reserved source-0 priority (always 0).</ipxact:description>
+          <ipxact:addressOffset>0x000</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00000000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>4</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x0</ipxact:value>
+                <ipxact:mask>0xF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- ───────── PRIORITY[1..31] (RW, 4-bit) ─────────
+             Encoded as an explicit array via dim+addressOffset increments.
+             Tools that support dim/dimensions read this as a 31-entry array. -->
+        <ipxact:register>
+          <ipxact:name>PRIORITY</ipxact:name>
+          <ipxact:description>Per-source priority. 0=disabled, 1..15=active.</ipxact:description>
+          <ipxact:dim>31</ipxact:dim>
+          <ipxact:addressOffset>0x004</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00000000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:description>Priority value for source N (PRIORITY[N], N=1..31).</ipxact:description>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>4</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x0</ipxact:value>
+                <ipxact:mask>0xF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- ───────── PENDING (RO, 32-bit) ───────── -->
+        <ipxact:register>
+          <ipxact:name>PENDING</ipxact:name>
+          <ipxact:description>Per-source pending. Bit i = source i pending. Bit 0 reserved (=0).</ipxact:description>
+          <ipxact:addressOffset>0x100</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00000000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>BITS</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x00000000</ipxact:value>
+                <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- ───────── PENDING_CLEAR (W1C) ───────── -->
+        <ipxact:register>
+          <ipxact:name>PENDING_CLEAR</ipxact:name>
+          <ipxact:description>Write 1 to clear pending bit (edge sources only). Reads as 0.</ipxact:description>
+          <ipxact:addressOffset>0x104</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>write-only</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00000000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>BITS</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>write-only</ipxact:access>
+            <ipxact:modifiedWriteValue>oneToClear</ipxact:modifiedWriteValue>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x00000000</ipxact:value>
+                <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- ───────── ENABLE (RW) ───────── -->
+        <ipxact:register>
+          <ipxact:name>ENABLE</ipxact:name>
+          <ipxact:description>Per-source enable. Bit i = source i unmasked. Bit 0 reserved (=0).</ipxact:description>
+          <ipxact:addressOffset>0x200</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00000000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>BITS</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x00000000</ipxact:value>
+                <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- ───────── THRESHOLD (RW, 4-bit) ───────── -->
+        <ipxact:register>
+          <ipxact:name>THRESHOLD</ipxact:name>
+          <ipxact:description>Global priority threshold. Source fires iff priority &gt; threshold.</ipxact:description>
+          <ipxact:addressOffset>0x300</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00000000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>4</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x0</ipxact:value>
+                <ipxact:mask>0xF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- ───────── CLAIM_COMPLETE (special: R→claim+clear, W→complete) ───────── -->
+        <ipxact:register>
+          <ipxact:name>CLAIM_COMPLETE</ipxact:name>
+          <ipxact:description>
+            Read: returns winning source ID and atomically clears its pending
+            (edge sources only). Write: completion acknowledgement (informational
+            in v1.0; reserved for multi-context gating in future).
+          </ipxact:description>
+          <ipxact:addressOffset>0x304</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00000000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>ID</ipxact:name>
+            <ipxact:description>Interrupt source ID (1..31). 0 = no pending eligible source.</ipxact:description>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>5</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+            <ipxact:readAction>clear</ipxact:readAction>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x00</ipxact:value>
+                <ipxact:mask>0x1F</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- ───────── IP_ID (RO constant) ───────── -->
+        <ipxact:register>
+          <ipxact:name>IP_ID</ipxact:name>
+          <ipxact:description>IP identifier constant ("IRC\1" = 0x49524301).</ipxact:description>
+          <ipxact:addressOffset>0x308</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x49524301</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x49524301</ipxact:value>
+                <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- ───────── IP_VERSION (RO constant) ───────── -->
+        <ipxact:register>
+          <ipxact:name>IP_VERSION</ipxact:name>
+          <ipxact:description>Version constant: {major[15:8], minor[7:0], patch[7:0]} = 1.0.0.</ipxact:description>
+          <ipxact:addressOffset>0x30C</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00010000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>MAJOR</ipxact:name>
+            <ipxact:bitOffset>16</ipxact:bitOffset>
+            <ipxact:bitWidth>8</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x01</ipxact:value>
+                <ipxact:mask>0xFF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>MINOR</ipxact:name>
+            <ipxact:bitOffset>8</ipxact:bitOffset>
+            <ipxact:bitWidth>8</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x00</ipxact:value>
+                <ipxact:mask>0xFF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>PATCH</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>8</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+            <ipxact:resets>
+              <ipxact:reset>
+                <ipxact:value>0x00</ipxact:value>
+                <ipxact:mask>0xFF</ipxact:mask>
+              </ipxact:reset>
+            </ipxact:resets>
+          </ipxact:field>
+        </ipxact:register>
+
+      </ipxact:addressBlock>
+    </ipxact:memoryMap>
+  </ipxact:memoryMaps>
+
+  <!-- ============================ Model / Parameters ============================ -->
+  <ipxact:model>
+    <ipxact:views>
+      <ipxact:view>
+        <ipxact:name>rtl</ipxact:name>
+        <ipxact:envIdentifier>:vivado.xilinx.com:</ipxact:envIdentifier>
+        <ipxact:componentInstantiationRef>rtl_inst</ipxact:componentInstantiationRef>
+      </ipxact:view>
+    </ipxact:views>
+
+    <ipxact:instantiations>
+      <ipxact:componentInstantiation>
+        <ipxact:name>rtl_inst</ipxact:name>
+        <ipxact:language>systemverilog</ipxact:language>
+        <ipxact:moduleName>irq_ctrl</ipxact:moduleName>
+        <ipxact:fileSetRef><ipxact:localName>rtl_files</ipxact:localName></ipxact:fileSetRef>
+        <ipxact:moduleParameters>
+          <ipxact:moduleParameter>
+            <ipxact:name>NUM_IRQ</ipxact:name>
+            <ipxact:value>32</ipxact:value>
+          </ipxact:moduleParameter>
+          <ipxact:moduleParameter>
+            <ipxact:name>PRIO_W</ipxact:name>
+            <ipxact:value>4</ipxact:value>
+          </ipxact:moduleParameter>
+        </ipxact:moduleParameters>
+      </ipxact:componentInstantiation>
+    </ipxact:instantiations>
+
+    <ipxact:ports>
+      <ipxact:port>
+        <ipxact:name>clk</ipxact:name>
+        <ipxact:wire><ipxact:direction>in</ipxact:direction></ipxact:wire>
+      </ipxact:port>
+      <ipxact:port>
+        <ipxact:name>rst_n</ipxact:name>
+        <ipxact:wire><ipxact:direction>in</ipxact:direction></ipxact:wire>
+      </ipxact:port>
+      <ipxact:port>
+        <ipxact:name>irq_src_i</ipxact:name>
+        <ipxact:wire>
+          <ipxact:direction>in</ipxact:direction>
+          <ipxact:vectors>
+            <ipxact:vector><ipxact:left>31</ipxact:left><ipxact:right>0</ipxact:right></ipxact:vector>
+          </ipxact:vectors>
+        </ipxact:wire>
+      </ipxact:port>
+      <ipxact:port>
+        <ipxact:name>eip_o</ipxact:name>
+        <ipxact:wire><ipxact:direction>out</ipxact:direction></ipxact:wire>
+      </ipxact:port>
+      <ipxact:port>
+        <ipxact:name>eip_id_o</ipxact:name>
+        <ipxact:wire>
+          <ipxact:direction>out</ipxact:direction>
+          <ipxact:vectors>
+            <ipxact:vector><ipxact:left>4</ipxact:left><ipxact:right>0</ipxact:right></ipxact:vector>
+          </ipxact:vectors>
+        </ipxact:wire>
+      </ipxact:port>
+    </ipxact:ports>
+  </ipxact:model>
+
+  <ipxact:fileSets>
+    <ipxact:fileSet>
+      <ipxact:name>rtl_files</ipxact:name>
+      <ipxact:file>
+        <ipxact:name>../rtl/irq_ctrl.sv</ipxact:name>
+        <ipxact:fileType>systemVerilogSource</ipxact:fileType>
+      </ipxact:file>
+    </ipxact:fileSet>
+  </ipxact:fileSets>
+
+</ipxact:component>
