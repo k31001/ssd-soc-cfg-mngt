@@ -31,6 +31,7 @@ files:
     - doc/DESIGN.md
     - doc/PROGRAMMERS_GUIDE.md
     - doc/irq_ctrl.ipxact.xml
+    - doc/diagrams/  # WaveDrom JSON + 렌더된 SVG
   sw:
     - sw/irq_ctrl_hal.h
     - sw/irq_ctrl_hal.c

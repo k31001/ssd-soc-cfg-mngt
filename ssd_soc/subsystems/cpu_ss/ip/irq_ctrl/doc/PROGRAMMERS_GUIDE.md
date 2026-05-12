@@ -91,6 +91,16 @@ source별 detection mode는 instantiation 시점의 `EDGE_MASK` parameter로
 
 CPU machine-mode trap vector에서의 표준 PLIC handler:
 
+```mermaid
+flowchart TD
+    A["trap entry<br/>(mext_irq_handler)"] --> B["id = irq_ctrl_claim()"]
+    B --> C{id == 0?}
+    C -- yes --> Z["return (spurious)"]
+    C -- no  --> D["g_isr_table[id]()"]
+    D --> E["irq_ctrl_complete(id)"]
+    E --> Z
+```
+
 ```c
 void mext_irq_handler(void)
 {

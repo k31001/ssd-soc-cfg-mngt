@@ -1,0 +1,20 @@
+{
+  "signal": [
+    { "name": "clk",          "wave": "p............." },
+    { "name": "irq_src_i[3]", "wave": "0.10.........." },
+    { "name": "pending_q[3]", "wave": "0..1......0...", "node": "...c......d" },
+    { "name": "eip_o",        "wave": "0..1......0..." },
+    { "name": "eip_id_o",     "wave": "x..=......x...", "data": ["3"] },
+    {},
+    { "name": "APB psel",     "wave": "0........1.0.." },
+    { "name": "APB penable",  "wave": "0.........10.." },
+    { "name": "APB paddr",    "wave": "x........=.x..", "data": ["0x304 (CLAIM)"] },
+    { "name": "APB prdata",   "wave": "x.........=.x.", "data": ["ID=3"], "node": "..........e" }
+  ],
+  "edge": [
+    "c->e edge captured; sticks until claim",
+    "e->d 1-cycle after ACCESS, pending_q[3] cleared"
+  ],
+  "head": { "text": "Edge interrupt + claim: src=3, EDGE_MASK[3]=1" },
+  "config": { "hscale": 1 }
+}

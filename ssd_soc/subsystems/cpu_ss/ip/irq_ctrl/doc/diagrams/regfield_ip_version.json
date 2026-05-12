@@ -1,0 +1,9 @@
+{
+  "reg": [
+    { "name": "PATCH",  "bits": 8,  "attr": "RO 0x00" },
+    { "name": "MINOR",  "bits": 8,  "attr": "RO 0x00" },
+    { "name": "MAJOR",  "bits": 8,  "attr": "RO 0x01" },
+    { "bits": 8,        "name": "rsvd", "type": 1 }
+  ],
+  "config": { "bits": 32, "lanes": 1, "hspace": 900 }
+}

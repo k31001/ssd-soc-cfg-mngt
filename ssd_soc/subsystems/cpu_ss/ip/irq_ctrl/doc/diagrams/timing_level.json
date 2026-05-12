@@ -1,0 +1,12 @@
+{
+  "signal": [
+    { "name": "clk",         "wave": "p........." },
+    { "name": "irq_src_i[16]","wave": "0...1...0." },
+    { "name": "pending_q[16]","wave": "0....1...0", "node": ".....a" },
+    { "name": "eligible[16]", "wave": "0....1...0" },
+    { "name": "eip_o",        "wave": "0....1...0", "node": ".....b" }
+  ],
+  "edge": [ "a~>b 1-cycle FF" ],
+  "head": { "text": "Level interrupt: src=16, priority>threshold, enable=1" },
+  "config": { "hscale": 1 }
+}

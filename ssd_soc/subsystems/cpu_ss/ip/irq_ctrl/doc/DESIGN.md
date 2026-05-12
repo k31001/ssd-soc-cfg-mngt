@@ -85,32 +85,28 @@ flat-port core에 연결한다.
 
 ## 4. Block diagram
 
-```
-                       ┌──────────────────────────────┐
-  irq_src_i[31:1] ──►──┤ Detect (edge/level)          ├──► pending_q[31:1]
-                       │   • EDGE_MASK[i]=1 → rising  │
-                       │   • EDGE_MASK[i]=0 → level   │
-                       └──────────────┬───────────────┘
-                                      │
-                ┌─────────────────────▼──────────────────────┐
-                │              Eligibility AND               │
-                │  eligible[i] = pending & enable &          │
-                │                (priority[i] > threshold)   │
-                └─────────────────────┬──────────────────────┘
-                                      │
-                ┌─────────────────────▼──────────────────────┐
-                │      Priority winner (combinational)        │
-                │   최고 priority; tie 시 최소 ID            │
-                └────────────┬──────────────────┬────────────┘
-                             │                  │
-                       best_id (eip_id_o)   best_prio
-                             │
-                       (best_id != 0) ──► eip_o
+```mermaid
+flowchart LR
+    SRC["irq_src_i[31:1]"] --> DET["Detect<br/>EDGE_MASK[i]=1 → rising<br/>EDGE_MASK[i]=0 → level"]
+    DET --> PEND["pending_q[31:1]"]
 
-           APB regfile ──► priority[31:0], enable, threshold
-           APB read mux ──► prdata
-           Claim read    ──► pending_q[best_id] clear (edge만)
-           Pending W1C   ──► pending_q 비트 clear (edge만)
+    APB[["APB regfile"]] --> ENA[ENABLE]
+    APB --> PRIO[PRIORITY array]
+    APB --> THR[THRESHOLD]
+
+    PEND --> ELIG{{"Eligibility AND<br/>pending &amp; enable &amp; (priority &gt; threshold)"}}
+    ENA  --> ELIG
+    PRIO --> ELIG
+    THR  --> ELIG
+
+    ELIG --> ARB["Priority winner<br/>(comb., tie→lowest ID)"]
+    ARB --> EIP[eip_o]
+    ARB --> EID[eip_id_o]
+
+    CLM["CLAIM_COMPLETE<br/>(R: claim)"] -. "best_id != 0" .-> PEND
+    APB --> CLM
+    APB --> W1C["PENDING_CLEAR (W1C)"]
+    W1C -. "edge sources" .-> PEND
 ```
 
 ---
@@ -137,6 +133,23 @@ flat-port core에 연결한다.
 **에러 동작:**
 - 미매핑 offset read → `pslverr=1`, `prdata=0`.
 - RO register (`PENDING`, `IP_ID`, `IP_VERSION`) write → `pslverr=1`, 상태 변경 없음.
+
+### 5.1 대표 register의 bit-field 레이아웃
+
+`PRIORITY[i]` (4-bit field, 나머지 reserved):
+
+![PRIORITY bit-field](diagrams/regfield_priority.svg)
+
+`CLAIM_COMPLETE` ([4:0] ID, 나머지 reserved):
+
+![CLAIM_COMPLETE bit-field](diagrams/regfield_claim_complete.svg)
+
+`IP_VERSION` (PATCH / MINOR / MAJOR 분할):
+
+![IP_VERSION bit-field](diagrams/regfield_ip_version.svg)
+
+> 도면 source는 `doc/diagrams/regfield_*.json`에 있으며,
+> `tools/render-diagrams.sh`로 SVG가 재생성된다.
 
 ---
 
@@ -185,23 +198,22 @@ flat-port core에 연결한다.
 ## 7. Timing
 
 ### 7.1 Level interrupt
-```
- clk      __┌──┐__┌──┐__┌──┐__┌──┐__┌──┐__┌──┐
- src[16]  ____________┌─────────────┐________
- pend[16] _______________┌──────────┐________   (1-cycle FF 지연)
- eip      _______________┌──────────┐________
-```
+
+![Level interrupt timing](diagrams/timing_level.svg)
+
+`irq_src_i[16]` 어서트 → 다음 clock edge에 `pending_q[16]` set →
+조합 경로로 `eip_o`까지 전파 (≈1 cycle FF 지연).
 
 ### 7.2 Edge interrupt + claim
-```
- clk        __┌──┐__┌──┐__┌──┐__┌──┐__┌──┐__┌──┐__┌──┐
- src[3]    ______┌──┐_______________________________     (1-cycle pulse)
- pend[3]   _________┌────────────────────┐__________     (claim까지 유지)
- eip       _________┌────────────────────┐__________
- APB R     ___________________[CLAIM]_______________     (id=3 반환)
- pend[3]   _________┌────────────────────┐__________
-                                         └ access 1 cycle 후 clear
-```
+
+![Edge interrupt + claim timing](diagrams/timing_edge_claim.svg)
+
+`irq_src_i[3]`의 1-cycle pulse가 edge 검출되어 `pending_q[3]`가 set되고
+claim read까지 유지된다. `CLAIM_COMPLETE` read의 ACCESS phase에서
+`prdata=ID=3`이 반환되고, 다음 cycle에 `pending_q[3]`가 atomic clear된다.
+
+> 도면 source는 `doc/diagrams/timing_*.json`에 있으며,
+> `tools/render-diagrams.sh`가 SVG를 산출한다.
 
 ---
 

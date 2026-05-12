@@ -23,6 +23,7 @@ PLIC 계열 platform-level interrupt controller (합성 가능, v1.0.0).
 - `doc/DESIGN.md` — 아키텍처, register map, datapath, 타이밍.
 - `doc/PROGRAMMERS_GUIDE.md` — bring-up, ISR 흐름, 사용 예제.
 - `doc/irq_ctrl.ipxact.xml` — IEEE 1685-2014 SFR 정의.
+- `doc/diagrams/*.json` + `*.svg` — WaveDrom source와 렌더 산출물 (bit-field/타이밍).
 - `sw/irq_ctrl_hal.{h,c}` — SFR map과 정합하는 C HAL.
 - `sw/test_hal_host.c` + `sw/Makefile` — 호스트 측 HAL smoke test
   (`cd sw && make test`).
