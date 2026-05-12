@@ -1,0 +1,15 @@
+# Subsystem metadata
+name: mem_ss
+owner: @ssd-soc/mem-team
+description: |
+  On-die memory and interconnect subsystem
+ips:
+  - ddr4_ctrl
+  - ddr4_phy
+  - sram_scratchpad
+  - axi_interconnect
+  - mem_arb
+integration:
+  bus: axi
+  clocks: [clk]
+  resets:  [rst_n]

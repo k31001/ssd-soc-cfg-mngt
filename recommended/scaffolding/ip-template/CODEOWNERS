@@ -1,0 +1,8 @@
+# Generated from ip.yaml — DO NOT EDIT MANUALLY.
+# `tools/sync_codeowners.py` 가 ip.yaml 의 owner/reviewers 와 동기화합니다.
+# 드리프트 감지 CI 가 PR 에 fail comment 를 답니다.
+
+*                       @acme-ssd/${TEAM}
+ip.yaml                 @acme-ssd/${TEAM} @acme-ssd/integration-team
+.github/workflows/      @acme-ssd/platform-team
+LICENSE                 @acme-ssd/legal-team

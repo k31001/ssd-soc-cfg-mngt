@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SKU: Gen4 1TB (8ch NAND, DDR4-4GB, PCIe Gen4 x4)
+  default.xml 을 include 한 뒤 SKU 별 핀(pinned tag) 만 덮어씀.
+  → 양산 SKU 마다 manifest 한 파일.
+-->
+<manifest>
+  <include name="default.xml" />
+
+  <!-- SKU 동결: 검증 통과한 tag 만 사용 -->
+  <remove-project name="ip-pcie_phy" />
+  <project name="ip-pcie_phy"   path="ip/pcie_phy"   revision="refs/tags/v2.4.0-gen4" upstream="main" />
+
+  <remove-project name="ip-pcie_ctrl" />
+  <project name="ip-pcie_ctrl"  path="ip/pcie_ctrl"  revision="refs/tags/v2.4.0-gen4" upstream="main" />
+
+  <remove-project name="ip-pcie_cfg" />
+  <project name="ip-pcie_cfg"   path="ip/pcie_cfg"   revision="refs/tags/v2.4.0-gen4" upstream="main" />
+
+  <remove-project name="ip-nand_phy" />
+  <project name="ip-nand_phy"   path="ip/nand_phy"   revision="refs/tags/v3.1.2-8ch"  upstream="main" />
+
+  <remove-project name="ip-nand_ctrl" />
+  <project name="ip-nand_ctrl"  path="ip/nand_ctrl"  revision="refs/tags/v3.1.2-8ch"  upstream="main" />
+
+  <remove-project name="ip-ddr4_ctrl" />
+  <project name="ip-ddr4_ctrl"  path="ip/ddr4_ctrl"  revision="refs/tags/v1.8.0-4gb"  upstream="main" />
+
+  <remove-project name="ssd-soc-top" />
+  <project name="ssd-soc-top"   path="top"           revision="refs/tags/sku-gen4-1tb-rc3" />
+</manifest>

@@ -1,0 +1,19 @@
+name: reusable-cdc
+on:
+  workflow_call:
+    inputs:
+      target_dir: { type: string, required: true }
+
+jobs:
+  cdc-dryrun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: CDC dry-run (no commercial license — heuristic only)
+        run: |
+          # 상용 도구(Spyglass, Conformal) 라이선스 없을 때 fallback.
+          # async clock 도메인 횡단 위반 패턴 정규식 검사.
+          python3 .ci/cdc_heuristic.py "${{ inputs.target_dir }}" \
+              --report-file cdc-report.md
+      - uses: actions/upload-artifact@v4
+        with: { name: cdc-report, path: cdc-report.md }

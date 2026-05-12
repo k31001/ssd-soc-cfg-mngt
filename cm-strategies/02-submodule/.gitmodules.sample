@@ -1,0 +1,115 @@
+# Top SoC repository 가 referencing 하는 submodule 정의 (샘플).
+# 실제 사용 시 `.gitmodules` 로 복사 후 git submodule add 로 SHA 가 자동 채워짐.
+
+# ── common ──
+[submodule "common-libs"]
+  path = common-libs
+  url  = git@github.com:acme-ssd/common-libs.git
+  branch = main
+
+# ── subsystems ──
+[submodule "subsystems/host_ss"]
+  path   = subsystems/host_ss
+  url    = git@github.com:acme-ssd/host_ss.git
+  branch = main
+
+[submodule "subsystems/fcc_ss"]
+  path   = subsystems/fcc_ss
+  url    = git@github.com:acme-ssd/fcc_ss.git
+  branch = main
+
+[submodule "subsystems/mem_ss"]
+  path   = subsystems/mem_ss
+  url    = git@github.com:acme-ssd/mem_ss.git
+  branch = main
+
+[submodule "subsystems/cpu_ss"]
+  path   = subsystems/cpu_ss
+  url    = git@github.com:acme-ssd/cpu_ss.git
+  branch = main
+
+[submodule "subsystems/sec_ss"]
+  path   = subsystems/sec_ss
+  url    = git@github.com:acme-ssd/sec_ss.git
+  branch = main
+
+# ── IPs (25개) ──
+[submodule "ip/pcie_phy"]
+  path = ip/pcie_phy
+  url  = git@github.com:acme-ssd/ip-pcie_phy.git
+[submodule "ip/pcie_ctrl"]
+  path = ip/pcie_ctrl
+  url  = git@github.com:acme-ssd/ip-pcie_ctrl.git
+[submodule "ip/nvme_cmd_proc"]
+  path = ip/nvme_cmd_proc
+  url  = git@github.com:acme-ssd/ip-nvme_cmd_proc.git
+[submodule "ip/host_dma"]
+  path = ip/host_dma
+  url  = git@github.com:acme-ssd/ip-host_dma.git
+[submodule "ip/pcie_cfg"]
+  path = ip/pcie_cfg
+  url  = git@github.com:acme-ssd/ip-pcie_cfg.git
+
+[submodule "ip/nand_phy"]
+  path = ip/nand_phy
+  url  = git@github.com:acme-ssd/ip-nand_phy.git
+[submodule "ip/nand_ctrl"]
+  path = ip/nand_ctrl
+  url  = git@github.com:acme-ssd/ip-nand_ctrl.git
+[submodule "ip/ldpc_codec"]
+  path = ip/ldpc_codec
+  url  = git@github.com:acme-ssd/ip-ldpc_codec.git
+[submodule "ip/flash_dma"]
+  path = ip/flash_dma
+  url  = git@github.com:acme-ssd/ip-flash_dma.git
+[submodule "ip/bbm"]
+  path = ip/bbm
+  url  = git@github.com:acme-ssd/ip-bbm.git
+
+[submodule "ip/ddr4_ctrl"]
+  path = ip/ddr4_ctrl
+  url  = git@github.com:acme-ssd/ip-ddr4_ctrl.git
+[submodule "ip/ddr4_phy"]
+  path = ip/ddr4_phy
+  url  = git@github.com:acme-ssd/ip-ddr4_phy.git
+[submodule "ip/sram_scratchpad"]
+  path = ip/sram_scratchpad
+  url  = git@github.com:acme-ssd/ip-sram_scratchpad.git
+[submodule "ip/axi_interconnect"]
+  path = ip/axi_interconnect
+  url  = git@github.com:acme-ssd/ip-axi_interconnect.git
+[submodule "ip/mem_arb"]
+  path = ip/mem_arb
+  url  = git@github.com:acme-ssd/ip-mem_arb.git
+
+[submodule "ip/riscv_core"]
+  path = ip/riscv_core
+  url  = git@github.com:acme-ssd/ip-riscv_core.git
+[submodule "ip/icache"]
+  path = ip/icache
+  url  = git@github.com:acme-ssd/ip-icache.git
+[submodule "ip/dcache"]
+  path = ip/dcache
+  url  = git@github.com:acme-ssd/ip-dcache.git
+[submodule "ip/debug_module"]
+  path = ip/debug_module
+  url  = git@github.com:acme-ssd/ip-debug_module.git
+[submodule "ip/irq_ctrl"]
+  path = ip/irq_ctrl
+  url  = git@github.com:acme-ssd/ip-irq_ctrl.git
+
+[submodule "ip/aes_engine"]
+  path = ip/aes_engine
+  url  = git@github.com:acme-ssd/ip-aes_engine.git
+[submodule "ip/sha_engine"]
+  path = ip/sha_engine
+  url  = git@github.com:acme-ssd/ip-sha_engine.git
+[submodule "ip/trng"]
+  path = ip/trng
+  url  = git@github.com:acme-ssd/ip-trng.git
+[submodule "ip/secure_boot_rom"]
+  path = ip/secure_boot_rom
+  url  = git@github.com:acme-ssd/ip-secure_boot_rom.git
+[submodule "ip/key_store"]
+  path = ip/key_store
+  url  = git@github.com:acme-ssd/ip-key_store.git

@@ -1,0 +1,46 @@
+name: reusable-full-soc
+on:
+  workflow_call:
+    inputs:
+      tests:           { type: string, required: false, default: 'smoke' }
+      timeout_minutes: { type: number, required: false, default: 240 }
+
+jobs:
+  full-soc:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync workspace from manifest
+        run: |
+          mkdir -p workspace
+          python3 .ci/repo_lite.py sync \
+              --manifest manifest/default.xml --workdir workspace
+
+      - name: Setup tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y verilator iverilog yosys
+
+      - name: Build full SoC
+        run: |
+          cd workspace
+          verilator --binary -Wno-fatal -Wno-DECLFILENAME \
+              --top-module ssd_soc_top \
+              -f ssd_soc/scripts/compile.f \
+              -Mdir build/obj_dir
+
+      - name: Run test groups
+        run: |
+          cd workspace/build/obj_dir
+          IFS=',' read -ra GROUPS <<< "${{ inputs.tests }}"
+          for g in "${GROUPS[@]}"; do
+            echo "::group::$g"
+            ./Vssd_soc_top +testgroup=$g || exit 1
+            echo "::endgroup::"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: full-soc-logs, path: workspace/build/**/*.log }

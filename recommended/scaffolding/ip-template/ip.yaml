@@ -1,0 +1,55 @@
+# IPLM-lite v1 — IP metadata (single source of truth).
+# 본 파일은 CODEOWNERS, manifest, CI, BOM, dashboard 가 모두 참조합니다.
+# 변경 시 항상 PR 리뷰가 필요하며, 'owner' / 'status' 변경은 추가 승인자 필요.
+
+# ── 식별 ──
+name:        ${IP_NAME}              # snake_case
+version:     0.1.0                    # semver (MAJOR.MINOR.PATCH)
+status:      proto                    # proto | alpha | qual | gold
+language:    SystemVerilog
+license:     Apache-2.0               # SPDX identifier
+description: |
+  ${IP_DESCRIPTION}
+
+# ── 소속 ──
+subsystem:   ${SUBSYSTEM}            # host_ss | fcc_ss | mem_ss | cpu_ss | sec_ss
+owner:       "@acme-ssd/${TEAM}"     # GitHub team. CODEOWNERS 와 자동 동기화됨
+backup:      "@acme-ssd/${TEAM}-backup"
+reviewers:                            # 추가 필수 리뷰어 (status=qual 이상 시 enforce)
+  - "@acme-ssd/integration-team"
+
+# ── 인터페이스 ──
+bus:         axi                      # axi | apb | ahb
+clocks:      [clk]
+resets:      [rst_n]
+parameters: {}                        # name: default 형태로 채움
+
+# ── 의존성 ──
+dependencies:
+  - common-libs >= 1.0.0
+
+# ── 품질 게이트 ──
+qual:
+  lint:      pending                  # pending | pass | fail
+  cdc:       pending
+  coverage:  pending                  # 목표: > 90% line / 85% functional
+  formal:    pending
+  qual_report: null                   # URL 또는 파일 경로
+
+# ── 파일 ──
+files:
+  rtl:
+    - rtl/${IP_NAME}.sv
+  sim:
+    - sim/tb_${IP_NAME}.sv
+  waivers:
+    - cfg/waivers.yaml                # IP-local lint waivers
+
+# ── 자동화 메타 ──
+ci:
+  workflow:   .github/workflows/ci.yml
+  required_checks:
+    - lint
+    - yaml-schema
+    - smoke-sim
+    - semver-bump-check

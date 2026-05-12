@@ -1,0 +1,25 @@
+name: reusable-smoke-sim
+on:
+  workflow_call:
+    inputs:
+      tb_dir: { type: string, required: true }
+
+jobs:
+  icarus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Icarus + cocotb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y iverilog
+          pip install cocotb pytest
+      - name: Compile + run smoke tests
+        run: |
+          for tb in $(find "${{ inputs.tb_dir }}" -name 'tb_*.sv'); do
+            name=$(basename "$tb" .sv)
+            echo "::group::$name"
+            iverilog -g2012 -o /tmp/$name.vvp $(find rtl -name '*.sv') "$tb" || exit 1
+            vvp /tmp/$name.vvp || exit 1
+            echo "::endgroup::"
+          done

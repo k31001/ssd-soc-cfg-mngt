@@ -1,0 +1,83 @@
+name: top-soc-ci
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 14 * * 5'  # 매주 금요일 23:00 KST
+  push:
+    tags: ['sku-*']
+  workflow_dispatch:
+
+jobs:
+  full-soc-elab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Repo sync (via manifest)
+        run: |
+          mkdir -p workspace
+          python3 .ci/repo_lite.py sync --manifest manifest/default.xml --workdir workspace
+
+      - name: Setup Verilator
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y verilator iverilog
+
+      - name: Full SoC elaboration
+        run: |
+          cd workspace
+          verilator --lint-only -Wno-fatal -f scripts/compile.f --top-module ssd_soc_top
+
+  full-soc-sim:
+    if: github.event_name == 'schedule'
+    needs: [full-soc-elab]
+    uses: acme-ssd/.github/.github/workflows/reusable-full-soc.yml@main
+    with:
+      tests: smoke,nvme_basic,boot,power
+      timeout_minutes: 360
+
+  dry-synth:
+    if: github.event_name == 'schedule'
+    needs: [full-soc-elab]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Yosys elaborate (open-source synth dry-run)
+        run: |
+          sudo apt-get install -y yosys
+          yosys -p "read_verilog -sv -f scripts/compile.f; hierarchy -check -top ssd_soc_top; stat"
+
+  coverage-rollup:
+    if: github.event_name == 'schedule'
+    needs: [full-soc-sim]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect IP/Subsystem coverage and merge
+        run: python3 .ci/coverage_rollup.py --output soc-coverage.xml
+
+  release-snapshot:
+    if: startsWith(github.ref, 'refs/tags/sku-')
+    needs: [full-soc-elab]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Freeze manifest snapshot
+        run: |
+          mkdir -p workspace
+          python3 .ci/repo_lite.py sync --manifest manifest/default.xml --workdir workspace
+          python3 .ci/repo_lite.py freeze --manifest manifest/default.xml --workdir workspace \
+              > releases/release-${{ github.ref_name }}.xml
+
+      - name: Publish BOM
+        run: |
+          python3 .ci/bom.py --manifest manifest/default.xml --workdir workspace \
+              --output releases/BOM-${{ github.ref_name }}.md
+
+      - name: Commit release artifacts
+        run: |
+          git config user.name  "ssd-soc-bot"
+          git config user.email "bot@acme-ssd"
+          git add releases/
+          git commit -m "release: snapshot ${{ github.ref_name }}"
+          git push

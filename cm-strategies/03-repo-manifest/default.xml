@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ssd-soc Mainline manifest (HEAD-tracking).
+  - 각 project 가 별도 Git repo. revision 이 branch 면 HEAD 추적, tag/SHA 면 핀.
+  - sku-*.xml 은 본 파일을 기반으로 일부 project revision 만 덮어쓴 파생 manifest.
+
+  명령:
+    repo init -u git@github.com:acme-ssd/ssd-soc-manifest.git -b main -m default.xml
+    repo sync -j 16
+-->
+<manifest>
+  <remote  name="acme"       fetch="git@github.com:acme-ssd/"    review="github.com" />
+  <remote  name="vendor"     fetch="git@github.com:ldpc-vendor/"                       />
+  <default remote="acme" revision="main" sync-j="8" />
+
+  <!-- ── Top & common ── -->
+  <project name="ssd-soc-top"   path="top"          groups="default,top" />
+  <project name="common-libs"   path="common-libs"  groups="default,common" />
+  <project name="verif-framework" path="verif"      groups="default,verif" />
+
+  <!-- ── Subsystems (5) ── -->
+  <project name="host_ss"  path="subsystems/host_ss" groups="default,ss,host" />
+  <project name="fcc_ss"   path="subsystems/fcc_ss"  groups="default,ss,flash" />
+  <project name="mem_ss"   path="subsystems/mem_ss"  groups="default,ss,mem" />
+  <project name="cpu_ss"   path="subsystems/cpu_ss"  groups="default,ss,cpu" />
+  <project name="sec_ss"   path="subsystems/sec_ss"  groups="default,ss,security" />
+
+  <!-- ── Host IPs (5) ── -->
+  <project name="ip-pcie_phy"      path="ip/pcie_phy"      groups="default,ip,host" />
+  <project name="ip-pcie_ctrl"     path="ip/pcie_ctrl"     groups="default,ip,host" />
+  <project name="ip-nvme_cmd_proc" path="ip/nvme_cmd_proc" groups="default,ip,host" />
+  <project name="ip-host_dma"      path="ip/host_dma"      groups="default,ip,host" />
+  <project name="ip-pcie_cfg"      path="ip/pcie_cfg"      groups="default,ip,host" />
+
+  <!-- ── Flash IPs (5) ── -->
+  <project name="ip-nand_phy"   path="ip/nand_phy"   groups="default,ip,flash" />
+  <project name="ip-nand_ctrl"  path="ip/nand_ctrl"  groups="default,ip,flash" />
+  <project name="ip-ldpc_codec" path="ip/ldpc_codec" groups="default,ip,flash" />
+  <project name="ip-flash_dma"  path="ip/flash_dma"  groups="default,ip,flash" />
+  <project name="ip-bbm"        path="ip/bbm"        groups="default,ip,flash" />
+
+  <!-- ── Memory IPs (5) ── -->
+  <project name="ip-ddr4_ctrl"        path="ip/ddr4_ctrl"        groups="default,ip,mem" />
+  <project name="ip-ddr4_phy"         path="ip/ddr4_phy"         groups="default,ip,mem" />
+  <project name="ip-sram_scratchpad"  path="ip/sram_scratchpad"  groups="default,ip,mem" />
+  <project name="ip-axi_interconnect" path="ip/axi_interconnect" groups="default,ip,mem" />
+  <project name="ip-mem_arb"          path="ip/mem_arb"          groups="default,ip,mem" />
+
+  <!-- ── CPU IPs (5) ── -->
+  <project name="ip-riscv_core"   path="ip/riscv_core"   groups="default,ip,cpu" />
+  <project name="ip-icache"       path="ip/icache"       groups="default,ip,cpu" />
+  <project name="ip-dcache"       path="ip/dcache"       groups="default,ip,cpu" />
+  <project name="ip-debug_module" path="ip/debug_module" groups="default,ip,cpu" />
+  <project name="ip-irq_ctrl"     path="ip/irq_ctrl"     groups="default,ip,cpu" />
+
+  <!-- ── Security IPs (5) — 별도 ACL: 보안팀만 push 권한 ── -->
+  <project name="ip-aes_engine"      path="ip/aes_engine"      groups="default,ip,security" />
+  <project name="ip-sha_engine"      path="ip/sha_engine"      groups="default,ip,security" />
+  <project name="ip-trng"            path="ip/trng"            groups="default,ip,security" />
+  <project name="ip-secure_boot_rom" path="ip/secure_boot_rom" groups="default,ip,security" />
+  <project name="ip-key_store"       path="ip/key_store"       groups="default,ip,security" />
+
+  <!-- ── PDK (별도 ACL, 별도 LFS, opt-in 동기화) ── -->
+  <project name="pdk-views" path="pdk" groups="pdk" />
+</manifest>

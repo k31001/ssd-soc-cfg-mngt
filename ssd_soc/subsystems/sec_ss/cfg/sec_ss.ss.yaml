@@ -1,0 +1,15 @@
+# Subsystem metadata
+name: sec_ss
+owner: @ssd-soc/security-team
+description: |
+  Security subsystem (crypto + secure boot)
+ips:
+  - aes_engine
+  - sha_engine
+  - trng
+  - secure_boot_rom
+  - key_store
+integration:
+  bus: axi
+  clocks: [clk]
+  resets:  [rst_n]

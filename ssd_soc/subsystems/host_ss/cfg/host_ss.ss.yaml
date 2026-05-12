@@ -1,0 +1,15 @@
+# Subsystem metadata
+name: host_ss
+owner: @ssd-soc/host-team
+description: |
+  PCIe Gen4/NVMe host interface subsystem
+ips:
+  - pcie_phy
+  - pcie_ctrl
+  - nvme_cmd_proc
+  - host_dma
+  - pcie_cfg
+integration:
+  bus: axi
+  clocks: [clk]
+  resets:  [rst_n]

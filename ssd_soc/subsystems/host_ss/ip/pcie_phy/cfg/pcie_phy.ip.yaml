@@ -1,0 +1,27 @@
+# IP metadata — IPLM-lite schema v1
+# 본 파일이 IP의 single source of truth. CODEOWNERS, manifest, CI가 모두 참조.
+name: pcie_phy
+version: 0.1.0           # semver. CI가 PR마다 bump 여부 확인
+status: proto            # proto | alpha | qual | gold
+owner: @ssd-soc/host-team
+subsystem: host_ss
+description: |
+  PCIe Gen4 PHY (analog/digital stub)
+bus: axi               # axi | apb | ahb
+parameters:
+  LANES: 4
+  GEN: 4
+dependencies:
+  - common-libs >= 1.0.0
+license: Apache-2.0
+language: SystemVerilog
+qual:
+  lint: pending
+  cdc: pending
+  coverage: pending
+  qual_report: null
+files:
+  rtl:
+    - rtl/pcie_phy.sv
+  sim:
+    - sim/tb_pcie_phy.sv

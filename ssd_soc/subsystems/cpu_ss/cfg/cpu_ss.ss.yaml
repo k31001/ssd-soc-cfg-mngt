@@ -1,0 +1,15 @@
+# Subsystem metadata
+name: cpu_ss
+owner: @ssd-soc/cpu-team
+description: |
+  Embedded RISC-V CPU subsystem (FW execution)
+ips:
+  - riscv_core
+  - icache
+  - dcache
+  - debug_module
+  - irq_ctrl
+integration:
+  bus: axi
+  clocks: [clk]
+  resets:  [rst_n]

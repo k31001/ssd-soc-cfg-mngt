@@ -1,0 +1,24 @@
+# Pure Monorepo strategy 데모용 CODEOWNERS 샘플.
+# 실제 적용 시 organization 의 GitHub team slug 를 사용.
+
+# Global default
+*                                                @acme-ssd/integration-team
+
+# Common platform
+ssd_soc/common/                                  @acme-ssd/platform-team
+tools/                                           @acme-ssd/platform-team
+ci/                                              @acme-ssd/platform-team
+
+# Subsystem-level owners
+ssd_soc/subsystems/host_ss/                      @acme-ssd/host-team
+ssd_soc/subsystems/fcc_ss/                       @acme-ssd/flash-team
+ssd_soc/subsystems/mem_ss/                       @acme-ssd/mem-team
+ssd_soc/subsystems/cpu_ss/                       @acme-ssd/cpu-team
+ssd_soc/subsystems/sec_ss/                       @acme-ssd/security-team @acme-ssd/security-lead
+
+# IP-level overrides (예시: 보안 IP는 추가 승인자 요구)
+ssd_soc/subsystems/sec_ss/ip/aes_engine/         @acme-ssd/crypto-team @acme-ssd/security-lead
+ssd_soc/subsystems/sec_ss/ip/secure_boot_rom/    @acme-ssd/secure-boot-team @acme-ssd/security-lead
+
+# Documents
+docs/                                            @acme-ssd/docs-team

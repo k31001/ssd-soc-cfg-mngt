@@ -1,0 +1,21 @@
+name: reusable-codeowners-drift
+on:
+  workflow_call: {}
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run sync_codeowners.py --check
+        run: |
+          python3 .ci/sync_codeowners.py --repo . --check
+      - name: Suggested patch (on failure)
+        if: failure()
+        run: |
+          python3 .ci/sync_codeowners.py --repo .
+          git diff > codeowners.patch
+          echo "::error::Apply codeowners.patch and re-push to fix drift."
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: codeowners-patch, path: codeowners.patch }

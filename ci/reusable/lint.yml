@@ -1,0 +1,35 @@
+name: reusable-lint
+on:
+  workflow_call:
+    inputs:
+      target_dir: { type: string, required: true }
+      waivers:    { type: string, required: false, default: '' }
+
+jobs:
+  verible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Verible
+        run: |
+          VER="v0.0-4321-g1234abcd"   # pinned in real repo
+          wget -qO- https://github.com/chipsalliance/verible/releases/download/$VER/verible-$VER-linux-static-x86_64.tar.gz \
+            | sudo tar -xz -C /usr/local --strip-components=1
+      - name: Verible lint
+        run: |
+          ARGS=()
+          [ -n "${{ inputs.waivers }}" ] && [ -f "${{ inputs.waivers }}" ] && ARGS+=(--waiver_files "${{ inputs.waivers }}")
+          find "${{ inputs.target_dir }}" -name '*.sv' -o -name '*.svh' \
+            | xargs -r verible-verilog-lint "${ARGS[@]}" --rules=-line-length || exit 1
+
+  verilator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Verilator
+        run: sudo apt-get update -qq && sudo apt-get install -y verilator
+      - name: Verilator lint
+        run: |
+          verilator --lint-only -Wall -Wno-fatal -Wno-DECLFILENAME \
+            -y "${{ inputs.target_dir }}" \
+            $(find "${{ inputs.target_dir }}" -name '*.sv')

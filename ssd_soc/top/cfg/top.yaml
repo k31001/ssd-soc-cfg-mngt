@@ -1,0 +1,18 @@
+# Top SoC metadata (declarative — OpenTitan 스타일 참고)
+name: ssd_soc_top
+version: 0.1.0
+derivatives:
+  - sku: gen4-1tb
+    nand_channels: 8
+    pcie_gen: 4
+    dram: ddr4-4gb
+  - sku: gen5-4tb
+    nand_channels: 16
+    pcie_gen: 5
+    dram: ddr4-16gb
+subsystems:
+  - host_ss
+  - fcc_ss
+  - mem_ss
+  - cpu_ss
+  - sec_ss

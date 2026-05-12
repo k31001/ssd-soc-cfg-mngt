@@ -1,0 +1,27 @@
+# IP metadata — IPLM-lite schema v1
+# 본 파일이 IP의 single source of truth. CODEOWNERS, manifest, CI가 모두 참조.
+name: axi_interconnect
+version: 0.1.0           # semver. CI가 PR마다 bump 여부 확인
+status: proto            # proto | alpha | qual | gold
+owner: @ssd-soc/mem-team
+subsystem: mem_ss
+description: |
+  SoC-level AXI interconnect (NoC stub)
+bus: axi               # axi | apb | ahb
+parameters:
+  NUM_MASTERS: 8
+  NUM_SLAVES: 12
+dependencies:
+  - common-libs >= 1.0.0
+license: Apache-2.0
+language: SystemVerilog
+qual:
+  lint: pending
+  cdc: pending
+  coverage: pending
+  qual_report: null
+files:
+  rtl:
+    - rtl/axi_interconnect.sv
+  sim:
+    - sim/tb_axi_interconnect.sv

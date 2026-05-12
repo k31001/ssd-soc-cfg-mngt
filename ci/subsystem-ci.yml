@@ -1,0 +1,56 @@
+name: subsystem-ci
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 18 * * *'   # 매일 03:00 KST (UTC 18:00)
+  workflow_dispatch:
+
+jobs:
+  manifest-resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve IP dependencies from mainline manifest
+        run: |
+          # subsystem 의 ss.yaml ips: 리스트가 mainline manifest 와 일치하는지 검증
+          python3 .ci/check_ss_ip_consistency.py cfg/*.ss.yaml \
+              --manifest https://raw.githubusercontent.com/acme-ssd/ssd-soc-manifest/main/default.xml
+
+  integration-sim:
+    needs: [manifest-resolve]
+    uses: acme-ssd/.github/.github/workflows/reusable-integration-sim.yml@main
+    with:
+      sim_top:  ${{ github.event.repository.name }}
+      duration: 200us
+
+  cdc-rdc:
+    needs: [manifest-resolve]
+    uses: acme-ssd/.github/.github/workflows/reusable-cdc.yml@main
+    with:
+      target_dir: rtl/
+
+  coverage-merge:
+    if: github.event_name == 'schedule'
+    needs: [integration-sim]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Merge coverage from IP nightly runs
+        run: python3 .ci/coverage_merge.py --output coverage.xml
+      - uses: actions/upload-artifact@v4
+        with: { name: coverage, path: coverage.xml }
+
+  golden-tag:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [integration-sim, cdc-rdc]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Auto-tag subsystem golden if all green
+        run: |
+          ts=$(date +%Y%m%d-%H%M)
+          git tag "golden-$ts" -m "Subsystem golden auto-tag"
+          git push --tags

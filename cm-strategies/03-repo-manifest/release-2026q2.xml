@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Release snapshot — 2026Q2 분기 동결 manifest.
+  `repo manifest -r -o release-2026q2.xml` 명령의 산출물 예시.
+  모든 project 가 정확한 SHA로 핀(pinned) 되어 재현 가능.
+  실제 SHA 는 빌드 시 채워짐 — 본 파일은 포맷 데모.
+-->
+<manifest>
+  <remote  name="acme" fetch="git@github.com:acme-ssd/" />
+  <default remote="acme" />
+
+  <project name="ssd-soc-top"      path="top"          revision="aaaa1111bbbb2222cccc3333dddd4444eeee5555" />
+  <project name="common-libs"      path="common-libs"  revision="1111aaaa2222bbbb3333cccc4444dddd5555eeee" />
+  <project name="verif-framework"  path="verif"        revision="dead0001beef0002cafe0003babe0004face0005" />
+
+  <project name="host_ss"  path="subsystems/host_ss"  revision="hhh11111hhh22222hhh33333hhh44444hhh55555" />
+  <project name="fcc_ss"   path="subsystems/fcc_ss"   revision="fff11111fff22222fff33333fff44444fff55555" />
+  <project name="mem_ss"   path="subsystems/mem_ss"   revision="mmm11111mmm22222mmm33333mmm44444mmm55555" />
+  <project name="cpu_ss"   path="subsystems/cpu_ss"   revision="ccc11111ccc22222ccc33333ccc44444ccc55555" />
+  <project name="sec_ss"   path="subsystems/sec_ss"   revision="sss11111sss22222sss33333sss44444sss55555" />
+
+  <!-- 본 데모에선 IP SHA는 생략. 실제 출력에선 25개 모두 박힘. -->
+</manifest>

@@ -1,0 +1,26 @@
+# IP metadata — IPLM-lite schema v1
+# 본 파일이 IP의 single source of truth. CODEOWNERS, manifest, CI가 모두 참조.
+name: debug_module
+version: 0.1.0           # semver. CI가 PR마다 bump 여부 확인
+status: proto            # proto | alpha | qual | gold
+owner: @ssd-soc/cpu-team
+subsystem: cpu_ss
+description: |
+  RISC-V debug module (JTAG/DM)
+bus: apb               # axi | apb | ahb
+parameters:
+  HARTS: 1
+dependencies:
+  - common-libs >= 1.0.0
+license: Apache-2.0
+language: SystemVerilog
+qual:
+  lint: pending
+  cdc: pending
+  coverage: pending
+  qual_report: null
+files:
+  rtl:
+    - rtl/debug_module.sv
+  sim:
+    - sim/tb_debug_module.sv

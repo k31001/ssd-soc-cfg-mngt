@@ -1,0 +1,8 @@
+# Template applied by tools/sync_codeowners.py to each IP repo on every PR.
+# Drift detector ip.yaml↔CODEOWNERS uses this template as the canonical form.
+
+*                       ${OWNER} ${BACKUP}
+ip.yaml                 ${OWNER} @acme-ssd/integration-team
+.github/workflows/      @acme-ssd/platform-team
+LICENSE                 @acme-ssd/legal-team
+${EXTRA_REVIEWER_LINES}

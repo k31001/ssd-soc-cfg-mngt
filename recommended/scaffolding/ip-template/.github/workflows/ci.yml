@@ -1,0 +1,61 @@
+name: ip-ci
+
+# 신규 IP repo 의 기본 CI workflow. 본 파일은 seed-ip.sh 가 자동 복사합니다.
+# 실제 lint/sim 작업은 ci/reusable/ 의 reusable workflow 를 호출하므로,
+# 정책 변경 시 IP repo 마다 수정할 필요가 없습니다.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags:     ['v*']
+
+jobs:
+  lint:
+    uses: acme-ssd/.github/.github/workflows/reusable-lint.yml@main
+    with:
+      target_dir: rtl/
+
+  yaml-schema:
+    uses: acme-ssd/.github/.github/workflows/reusable-yaml-schema.yml@main
+    with:
+      schema:    https://raw.githubusercontent.com/acme-ssd/.github/main/schemas/ip-yaml.json
+      target:    ip.yaml
+
+  smoke-sim:
+    uses: acme-ssd/.github/.github/workflows/reusable-smoke-sim.yml@main
+    with:
+      tb_dir:    sim/
+
+  semver-bump-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Verify ip.yaml version bumped vs target branch
+        run: |
+          python3 -c "
+          import yaml, subprocess
+          base = subprocess.check_output(['git','show', f'origin/${{ github.base_ref }}:ip.yaml']).decode()
+          head = open('ip.yaml').read()
+          bv = yaml.safe_load(base)['version']; hv = yaml.safe_load(head)['version']
+          if bv == hv:
+              print(f'::error::ip.yaml version must bump on PR. base={bv} head={hv}')
+              exit(1)
+          print(f'OK: {bv} -> {hv}')
+          "
+
+  notify-manifest:
+    needs: [lint, yaml-schema, smoke-sim]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger manifest-bump bot
+        run: |
+          gh api repos/acme-ssd/ssd-soc-manifest/dispatches \
+            -f event_type=ip-tag-published \
+            -f client_payload[ip]=${{ github.event.repository.name }} \
+            -f client_payload[tag]=${{ github.ref_name }}
+        env: { GH_TOKEN: ${{ secrets.MANIFEST_BUMP_TOKEN }} }

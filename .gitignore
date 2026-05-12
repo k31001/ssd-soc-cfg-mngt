@@ -1,0 +1,8 @@
+build/
+*.vcd
+*.fst
+*.log
+obj_dir/
+__pycache__/
+*.pyc
+.DS_Store

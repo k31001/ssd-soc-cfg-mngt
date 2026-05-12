@@ -1,0 +1,9 @@
+# Lint waivers (project-wide)
+# 각 IP는 자기 cfg/ 하위에 별도 waivers/ 가 가능. 본 파일은 SoC-wide 공통 waiver.
+waivers:
+  - rule: VARIABLE_UNUSED
+    scope: "**/stub*.sv"
+    reason: "Stub RTL 의도적 미사용 신호 허용 (Phase A 데모)"
+  - rule: UNDRIVEN_NET
+    scope: "ssd_soc/top/**"
+    reason: "Top-level pads 일부는 stub 상태에서 미구동"

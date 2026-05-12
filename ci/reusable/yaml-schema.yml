@@ -1,0 +1,28 @@
+name: reusable-yaml-schema
+on:
+  workflow_call:
+    inputs:
+      schema: { type: string, required: true }
+      target: { type: string, required: true }
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Install jsonschema + PyYAML
+        run: pip install jsonschema PyYAML
+      - name: Validate
+        run: |
+          python3 - <<'PY'
+          import json, sys, urllib.request, yaml, jsonschema
+          schema_url = "${{ inputs.schema }}"
+          target     = "${{ inputs.target }}"
+          schema = json.load(urllib.request.urlopen(schema_url)) if schema_url.startswith("http") else json.load(open(schema_url))
+          data   = yaml.safe_load(open(target))
+          jsonschema.validate(data, schema)
+          print(f"[ok] {target} validates against schema")
+          PY

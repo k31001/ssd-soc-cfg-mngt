@@ -1,0 +1,15 @@
+# Subsystem metadata
+name: fcc_ss
+owner: @ssd-soc/flash-team
+description: |
+  Flash Channel Controller subsystem (NAND interface)
+ips:
+  - nand_phy
+  - nand_ctrl
+  - ldpc_codec
+  - flash_dma
+  - bbm
+integration:
+  bus: axi
+  clocks: [clk]
+  resets:  [rst_n]

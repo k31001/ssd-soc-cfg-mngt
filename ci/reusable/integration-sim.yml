@@ -1,0 +1,33 @@
+name: reusable-integration-sim
+on:
+  workflow_call:
+    inputs:
+      sim_top:  { type: string, required: true }
+      duration: { type: string, required: false, default: 100us }
+
+jobs:
+  verilator-sim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: false }
+
+      - name: Resolve dependent IPs via manifest
+        run: |
+          # subsystem CI 는 mainline manifest 의 IP SHA 를 가져와 통합 sim 환경 구성
+          mkdir -p workspace
+          curl -sL https://raw.githubusercontent.com/acme-ssd/ssd-soc-manifest/main/default.xml \
+            > workspace/manifest.xml
+          python3 .ci/repo_lite.py sync --manifest workspace/manifest.xml --workdir workspace --groups default,ip,common
+
+      - name: Install Verilator
+        run: sudo apt-get update -qq && sudo apt-get install -y verilator
+
+      - name: Integration sim
+        run: |
+          verilator --binary -Wno-fatal -Wno-DECLFILENAME \
+            --top-module ${{ inputs.sim_top }} \
+            -f workspace/scripts/compile.f \
+            +duration=${{ inputs.duration }} \
+            -Mdir build/obj_dir
+          ./build/obj_dir/V${{ inputs.sim_top }} || exit 1

@@ -1,0 +1,27 @@
+# IP metadata — IPLM-lite schema v1
+# 본 파일이 IP의 single source of truth. CODEOWNERS, manifest, CI가 모두 참조.
+name: host_dma
+version: 0.1.0           # semver. CI가 PR마다 bump 여부 확인
+status: proto            # proto | alpha | qual | gold
+owner: @ssd-soc/host-team
+subsystem: host_ss
+description: |
+  Host-side DMA engine (PRP/SGL)
+bus: axi               # axi | apb | ahb
+parameters:
+  CHANNELS: 8
+  OUTSTANDING: 32
+dependencies:
+  - common-libs >= 1.0.0
+license: Apache-2.0
+language: SystemVerilog
+qual:
+  lint: pending
+  cdc: pending
+  coverage: pending
+  qual_report: null
+files:
+  rtl:
+    - rtl/host_dma.sv
+  sim:
+    - sim/tb_host_dma.sv
