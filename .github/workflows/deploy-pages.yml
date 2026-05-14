@@ -1,0 +1,58 @@
+name: deploy-pages
+
+# IP closed-loop workflow 대시보드 (web/) 를 GitHub Pages 로 배포한다.
+# main push 마다:
+#   1) tools/ipflow.py status --json 으로 web/data/status.json 을 재생성
+#   2) tools/render-diagrams.sh 로 모든 WaveDrom 도면을 재렌더 (drift 흡수)
+#   3) web/ 폴더를 Pages artifact 로 업로드 후 deploy
+#
+# Settings → Pages → Source = "GitHub Actions" 가 전제.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 동시 배포 방지 — 같은 ref 에 대해 진행 중인 배포가 있으면 cancel
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+
+      - name: Regenerate web/data/status.json
+        run: |
+          mkdir -p web/data
+          python3 tools/ipflow.py status --json > web/data/status.json
+
+      - name: Render WaveDrom diagrams (refresh SVGs in web/ artifact)
+        # web/ 폴더에는 diagrams 가 없지만, 이 step 은 다른 IP 의 diagrams 가
+        # 미렌더 상태로 push 되었을 때를 대비한 안전망 (drift 검출은 ip-ci 가 담당).
+        run: |
+          if find ssd_soc -type d -name diagrams | grep -q .; then
+            bash tools/render-diagrams.sh
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

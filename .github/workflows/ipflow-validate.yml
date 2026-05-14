@@ -1,0 +1,65 @@
+name: ipflow-validate
+
+# docs/WORKFLOW.md §3 의 closed-loop invariant 검사.
+# scenarios.yaml 이 있는 IP (Stage 7 이상) 에만 적용한다 — 아직 spec/stub 단계인
+# IP 는 invariant 가 의도적으로 깨져 있으므로 검사 대상에서 제외.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  discover:
+    # scenarios.yaml 이 있는 IP 의 경로 목록을 matrix 로 제공
+    runs-on: ubuntu-latest
+    outputs:
+      ips: ${{ steps.find.outputs.ips }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          mapfile -t paths < <(find ssd_soc -path '*/verif/scenarios.yaml' -printf '%h\n' | sed 's|/verif$||' | sort -u)
+          if [ ${#paths[@]} -eq 0 ]; then
+            echo 'ips=[]' >> "$GITHUB_OUTPUT"
+          else
+            json=$(printf '%s\n' "${paths[@]}" | python3 -c 'import sys,json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')
+            echo "ips=$json" >> "$GITHUB_OUTPUT"
+          fi
+          echo "discovered:" "${paths[@]:-<none>}"
+
+  validate:
+    needs: [discover]
+    if: needs.discover.outputs.ips != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ip: ${{ fromJSON(needs.discover.outputs.ips) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: ipflow validate ${{ matrix.ip }}
+        run: python3 tools/ipflow.py validate "${{ matrix.ip }}"
+
+  hal-host-smoke:
+    # validate 통과 후 HAL host smoke test 도 함께 돌린다.
+    needs: [discover, validate]
+    if: needs.discover.outputs.ips != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ip: ${{ fromJSON(needs.discover.outputs.ips) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: make test
+        run: |
+          if [ -f "${{ matrix.ip }}/sw/Makefile" ]; then
+            make -C "${{ matrix.ip }}/sw" test
+          else
+            echo "no sw/Makefile — skipped"
+          fi
