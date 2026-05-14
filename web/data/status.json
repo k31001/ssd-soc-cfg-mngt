@@ -1,0 +1,439 @@
+{
+  "ips": [
+    {
+      "name": "dcache",
+      "path": "ssd_soc/subsystems/cpu_ss/ip/dcache",
+      "subsystem": "cpu_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "debug_module",
+      "path": "ssd_soc/subsystems/cpu_ss/ip/debug_module",
+      "subsystem": "cpu_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "icache",
+      "path": "ssd_soc/subsystems/cpu_ss/ip/icache",
+      "subsystem": "cpu_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "irq_ctrl",
+      "path": "ssd_soc/subsystems/cpu_ss/ip/irq_ctrl",
+      "subsystem": "cpu_ss",
+      "version": "1.0.0",
+      "stages": {
+        "spec": true,
+        "rtl": true,
+        "design": true,
+        "ipxact": true,
+        "guide": true,
+        "hal": true,
+        "scenarios": true,
+        "sim": true
+      },
+      "percent": 100
+    },
+    {
+      "name": "riscv_core",
+      "path": "ssd_soc/subsystems/cpu_ss/ip/riscv_core",
+      "subsystem": "cpu_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "bbm",
+      "path": "ssd_soc/subsystems/fcc_ss/ip/bbm",
+      "subsystem": "fcc_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "flash_dma",
+      "path": "ssd_soc/subsystems/fcc_ss/ip/flash_dma",
+      "subsystem": "fcc_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "ldpc_codec",
+      "path": "ssd_soc/subsystems/fcc_ss/ip/ldpc_codec",
+      "subsystem": "fcc_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "nand_ctrl",
+      "path": "ssd_soc/subsystems/fcc_ss/ip/nand_ctrl",
+      "subsystem": "fcc_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "nand_phy",
+      "path": "ssd_soc/subsystems/fcc_ss/ip/nand_phy",
+      "subsystem": "fcc_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "host_dma",
+      "path": "ssd_soc/subsystems/host_ss/ip/host_dma",
+      "subsystem": "host_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "nvme_cmd_proc",
+      "path": "ssd_soc/subsystems/host_ss/ip/nvme_cmd_proc",
+      "subsystem": "host_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "pcie_cfg",
+      "path": "ssd_soc/subsystems/host_ss/ip/pcie_cfg",
+      "subsystem": "host_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "pcie_ctrl",
+      "path": "ssd_soc/subsystems/host_ss/ip/pcie_ctrl",
+      "subsystem": "host_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "pcie_phy",
+      "path": "ssd_soc/subsystems/host_ss/ip/pcie_phy",
+      "subsystem": "host_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "axi_interconnect",
+      "path": "ssd_soc/subsystems/mem_ss/ip/axi_interconnect",
+      "subsystem": "mem_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "ddr4_ctrl",
+      "path": "ssd_soc/subsystems/mem_ss/ip/ddr4_ctrl",
+      "subsystem": "mem_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "ddr4_phy",
+      "path": "ssd_soc/subsystems/mem_ss/ip/ddr4_phy",
+      "subsystem": "mem_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "mem_arb",
+      "path": "ssd_soc/subsystems/mem_ss/ip/mem_arb",
+      "subsystem": "mem_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "sram_scratchpad",
+      "path": "ssd_soc/subsystems/mem_ss/ip/sram_scratchpad",
+      "subsystem": "mem_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "aes_engine",
+      "path": "ssd_soc/subsystems/sec_ss/ip/aes_engine",
+      "subsystem": "sec_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "key_store",
+      "path": "ssd_soc/subsystems/sec_ss/ip/key_store",
+      "subsystem": "sec_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "secure_boot_rom",
+      "path": "ssd_soc/subsystems/sec_ss/ip/secure_boot_rom",
+      "subsystem": "sec_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "sha_engine",
+      "path": "ssd_soc/subsystems/sec_ss/ip/sha_engine",
+      "subsystem": "sec_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    },
+    {
+      "name": "trng",
+      "path": "ssd_soc/subsystems/sec_ss/ip/trng",
+      "subsystem": "sec_ss",
+      "version": "0.1.0",
+      "stages": {
+        "spec": true,
+        "rtl": false,
+        "design": false,
+        "ipxact": false,
+        "guide": false,
+        "hal": false,
+        "scenarios": false,
+        "sim": false
+      },
+      "percent": 12
+    }
+  ],
+  "stages": [
+    "spec",
+    "rtl",
+    "design",
+    "ipxact",
+    "guide",
+    "hal",
+    "scenarios",
+    "sim"
+  ]
+}

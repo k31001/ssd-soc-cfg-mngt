@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SSD SoC — IP Closed-Loop Workflow</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>SSD SoC — IP Closed-Loop Workflow</h1>
+      <p class="lead">RTL → 설계문서 → IP-XACT → Programmer's Guide → HAL → Test Scenarios → RTL Verification 의 폐쇄 루프를 정의하고, <code>tools/ipflow.py</code> 가 그 invariant 를 자동 검사한다.</p>
+      <nav>
+        <a href="#workflow">Workflow</a>
+        <a href="#stages">Stages</a>
+        <a href="#status">Live Status</a>
+        <a href="#trace">irq_ctrl Trace</a>
+        <a href="#harness">Harness</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- ─────────── Section 1: Workflow overview ─────────── -->
+    <section id="workflow">
+      <h2>1. 전체 흐름</h2>
+      <p>9-stage closed-loop. <strong>Programmer's Guide (Stage 5)</strong> 가 SW-HW 계약이며, scenarios (Stage 7) 가 그 계약을 RTL 검증으로 옮긴다.</p>
+
+      <div class="mermaid">
+flowchart TD
+    S1[Stage 1<br/>Spec &amp; Architecture]
+    S2[Stage 2<br/>RTL]
+    S3[Stage 3<br/>Design Doc]
+    S4[Stage 4<br/>IP-XACT SFR]
+    S5[Stage 5<br/>Programmer's Guide]:::contract
+    S6[Stage 6<br/>HAL]
+    S7[Stage 7<br/>Test Scenarios]:::contract
+    S8[Stage 8<br/>RTL Verification]
+    S9{{Stage 9<br/>Iteration / Sign-off}}
+
+    S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8
+    S8 -- coverage gap --> S9
+    S9 -- new scenarios --> S7
+    S9 -- spec change --> S1
+    S9 -- bug --> S2
+    S9 -- doc gap --> S5
+
+    classDef contract fill:#fdf6b2,stroke:#b58900,stroke-width:2px
+      </div>
+      <p class="caption">노란색 단계가 closed-loop 의 의미상 핵심(SW-HW 계약 + 그 계약의 검증화).</p>
+    </section>
+
+    <!-- ─────────── Section 2: Stages detail ─────────── -->
+    <section id="stages">
+      <h2>2. 단계별 산출물과 책임</h2>
+      <table class="stages-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Stage</th><th>산출물</th><th>책임자</th><th>Gate to next</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>Spec &amp; Architecture</td><td><code>cfg/&lt;ip&gt;.ip.yaml</code></td><td>IP architect</td><td>yaml-schema</td></tr>
+          <tr><td>2</td><td>RTL</td><td><code>rtl/&lt;ip&gt;.sv</code></td><td>RTL designer</td><td>lint + smoke TB</td></tr>
+          <tr><td>3</td><td>Design Doc</td><td><code>doc/DESIGN.md</code> + <code>doc/diagrams/*</code></td><td>RTL designer</td><td>regmap 표 ↔ port 표 완전성</td></tr>
+          <tr><td>4</td><td>IP-XACT SFR</td><td><code>doc/&lt;ip&gt;.ipxact.xml</code></td><td>RTL designer</td><td>DESIGN.md §5 와 1:1</td></tr>
+          <tr class="hl"><td>5</td><td>Programmer's Guide</td><td><code>doc/PROGRAMMERS_GUIDE.md</code></td><td>SW lead</td><td>§6 worked examples 정의</td></tr>
+          <tr><td>6</td><td>HAL</td><td><code>sw/&lt;ip&gt;_hal.{h,c}</code></td><td>SW engineer</td><td>host smoke + IP-XACT 매핑</td></tr>
+          <tr class="hl"><td>7</td><td>Test Scenarios</td><td><code>verif/scenarios.yaml</code></td><td>Verif engineer</td><td>가이드 §6 ↔ scenarios 매핑</td></tr>
+          <tr><td>8</td><td>RTL Verification</td><td><code>sim/tb_&lt;ip&gt;.sv</code></td><td>Verif engineer</td><td>모든 scenario PASS</td></tr>
+          <tr><td>9</td><td>Iteration / Sign-off</td><td>git tag <code>v&lt;sem&gt;</code></td><td>IP lead</td><td>전 invariant PASS</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ─────────── Section 3: Live status ─────────── -->
+    <section id="status">
+      <h2>3. Live status (이 레포의 25개 IP)</h2>
+      <p><code>tools/ipflow.py status --json</code> 의 출력을 그대로 읽는다. CI가 push 마다 갱신.</p>
+      <div id="status-table">Loading…</div>
+    </section>
+
+    <!-- ─────────── Section 4: irq_ctrl trace ─────────── -->
+    <section id="trace">
+      <h2>4. <code>irq_ctrl</code> closed-loop trace</h2>
+      <p>가이드 §6 worked example → scenarios.yaml → SystemVerilog TB task 매핑을 시각화. 끊긴 화살표가 있으면 <code>ipflow validate</code> 가 그것을 잡아낸다.</p>
+      <div class="mermaid">
+flowchart LR
+    subgraph Guide["Programmer's Guide §6"]
+      direction TB
+      G1["§6.1 UART RX (level)"]
+      G2["§6.2 DMA done (edge)"]
+      G3["§6.3 Soft-IRQ debug"]
+      G4["§6.4 Critical section"]
+    end
+    subgraph Scenarios["verif/scenarios.yaml"]
+      direction TB
+      S04[S04 level_source]
+      S05[S05 edge_source]
+      S06[S06 threshold_gating]
+      S08[S08 claim_atomic_clear]
+      S09[S09 pending_clear_w1c]
+    end
+    subgraph TB["sim/tb_irq_ctrl.sv"]
+      direction TB
+      T4[T4 inline check]
+      T5[T5 inline check]
+      T6[T6 inline check]
+      T8[T8 inline check]
+      T9[T9 inline check]
+    end
+
+    G1 --> S04
+    G2 --> S05
+    G2 --> S08
+    G2 --> S09
+    G3 --> S05
+    G4 --> S06
+
+    S04 --> T4
+    S05 --> T5
+    S06 --> T6
+    S08 --> T8
+    S09 --> T9
+      </div>
+    </section>
+
+    <!-- ─────────── Section 5: Harness commands ─────────── -->
+    <section id="harness">
+      <h2>5. Harness 명령</h2>
+      <pre><code># 모든 IP 의 stage matrix
+tools/ipflow.py status
+
+# closed-loop invariant 검사
+tools/ipflow.py validate ssd_soc/subsystems/cpu_ss/ip/irq_ctrl
+
+# scenarios.yaml 파싱 + TB task 매칭
+tools/ipflow.py scenarios ssd_soc/subsystems/cpu_ss/ip/irq_ctrl
+
+# 호스트 단계 일괄: 도면 렌더 → validate → HAL smoke test
+tools/ipflow.py run ssd_soc/subsystems/cpu_ss/ip/irq_ctrl
+
+# 웹 대시보드 데이터 갱신
+tools/ipflow.py status --json &gt; web/data/status.json</code></pre>
+
+      <h3>CI 통합</h3>
+      <p><code>ci/ip-ci.yml</code> 의 <code>workflow-validate</code> job 이 PR 마다 위 검사를 실행한다. 어느 invariant 라도 깨지면 PR fail.</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <small>Generated by <code>tools/ipflow.py</code>. Source: <a href="https://github.com/k31001/ssd-soc-cfg-mngt">k31001/ssd-soc-cfg-mngt</a>. 자세한 정의는 <a href="https://github.com/k31001/ssd-soc-cfg-mngt/blob/main/docs/WORKFLOW.md"><code>docs/WORKFLOW.md</code></a>.</small>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: true, securityLevel: "loose", flowchart: { htmlLabels: true } });
+  </script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+# irq_ctrl verification scenarios — closed-loop manifest
+#
+# 본 파일은 docs/WORKFLOW.md §2 Stage 7 의 산출물로,
+# doc/PROGRAMMERS_GUIDE.md 의 worked example 과 RTL 기능을 1:1 매핑한다.
+#
+# 각 scenario:
+#   id          — 고정 식별자 (S01, S02, ...)
+#   name        — 짧은 표기 (snake_case)
+#   guide_ref   — programmer's guide 의 섹션 (§N)
+#   rtl_features— 검증 대상 RTL 기능 태그
+#   summary     — 한 줄 설명
+#   tb_task     — sim/tb_irq_ctrl.sv 의 SV task 또는 "inline:<id>" 로 inline 검사
+#
+# tools/ipflow.py validate <ip> 가 본 파일을 가이드 / TB 와 cross-check 한다.
+
+ip: irq_ctrl
+version: 1.0.0
+
+scenarios:
+  - id: S01
+    name: reset_state
+    guide_ref: "§2"
+    rtl_features: [reset, regfile_default]
+    summary: "Reset 직후 모든 register가 0, eip 비활성"
+    tb_task: inline:T1
+
+  - id: S02
+    name: id_version_readback
+    guide_ref: "§9"
+    rtl_features: [ro_regs, ip_id, ip_version]
+    summary: "IP_ID / IP_VERSION RO 상수 readback"
+    tb_task: inline:T2
+
+  - id: S03
+    name: priority_enable_rw
+    guide_ref: "§3"
+    rtl_features: [regfile_rw, priority, enable]
+    summary: "PRIORITY[i] / ENABLE RW round-trip; source 0 forced 0"
+    tb_task: inline:T3
+
+  - id: S04
+    name: level_source
+    guide_ref: "§6"
+    rtl_features: [level_detect, eligibility, arbiter]
+    summary: "Level source: pending 이 line 추적, eip rise/fall"
+    tb_task: inline:T4
+
+  - id: S05
+    name: edge_source
+    guide_ref: "§6"
+    rtl_features: [edge_detect, pending_latch]
+    summary: "Edge source: 1-cycle pulse 후에도 pending 유지"
+    tb_task: inline:T5
+
+  - id: S06
+    name: threshold_gating
+    guide_ref: "§3"
+    rtl_features: [threshold, eligibility]
+    summary: "THRESHOLD ≥ priority 시 eip 차단; 낮추면 복귀"
+    tb_task: inline:T6
+
+  - id: S07
+    name: priority_arbitration
+    guide_ref: "§3"
+    rtl_features: [arbiter, tie_break]
+    summary: "최고 priority 우승; tie 시 최소 ID 우승"
+    tb_task: inline:T7
+
+  - id: S08
+    name: claim_atomic_clear
+    guide_ref: "§5"
+    rtl_features: [claim, edge_pending_clear]
+    summary: "CLAIM_COMPLETE read 가 winning source ID 반환 및 pending atomic clear"
+    tb_task: inline:T8
+
+  - id: S09
+    name: pending_clear_w1c
+    guide_ref: "§6"
+    rtl_features: [w1c, edge_pending_clear]
+    summary: "PENDING_CLEAR W1C 가 edge source pending 비트를 clear"
+    tb_task: inline:T9
+
+  - id: S10
+    name: pslverr_unmapped
+    guide_ref: "§7"
+    rtl_features: [apb_pslverr, addr_decode]
+    summary: "미매핑 주소 read 시 pslverr=1"
+    tb_task: inline:T10
+
+  - id: S11
+    name: pslverr_ro_write
+    guide_ref: "§7"
+    rtl_features: [apb_pslverr, ro_protection]
+    summary: "PENDING / IP_ID / IP_VERSION write 시 pslverr=1"
+    tb_task: inline:T11
+
+# ─────────────────────── 가이드 §6 worked example 매핑 ───────────────────────
+# 가이드 §6.1 ~ §6.4 의 각 사용 시나리오를 위 11개 시나리오에 매핑한다.
+# (별도 TB task 없이 cross-reference 만 명시 — invariant 검사용)
+
+guide_example_mapping:
+  "§6.1 UART RX level":          [S04]              # level source 활성화
+  "§6.2 DMA done edge":          [S05, S08, S09]    # edge + claim + W1C 전체
+  "§6.3 Software-trigger debug": [S05]              # GPIO source 주입과 동치
+  "§6.4 Critical section":       [S06]              # threshold 일시 상향/복원
+
+# ─────────────────────── RTL feature coverage 태그 ───────────────────────
+# scenario 의 rtl_features union 이 본 목록을 모두 cover 해야 함.
+# (ipflow 의 향후 coverage 리포트 항목)
+rtl_features_required:
+  - reset
+  - regfile_default
+  - regfile_rw
+  - priority
+  - enable
+  - threshold
+  - level_detect
+  - edge_detect
+  - pending_latch
+  - eligibility
+  - arbiter
+  - tie_break
+  - claim
+  - edge_pending_clear
+  - w1c
+  - apb_pslverr
+  - addr_decode
+  - ro_protection
+  - ro_regs
+  - ip_id
+  - ip_version

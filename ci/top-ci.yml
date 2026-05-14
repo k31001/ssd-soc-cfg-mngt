@@ -6,6 +6,7 @@ on:
   schedule:
     - cron: '0 14 * * 5'  # 매주 금요일 23:00 KST
   push:
+    branches: [main]      # web 대시보드 자동 갱신 트리거
     tags: ['sku-*']
   workflow_dispatch:
 
@@ -55,6 +56,52 @@ jobs:
     steps:
       - name: Collect IP/Subsystem coverage and merge
         run: python3 .ci/coverage_rollup.py --output soc-coverage.xml
+
+  refresh-web-status:
+    # main 으로 push 가 들어오면 tools/ipflow.py status --json 을 재실행해
+    # web/data/status.json 을 갱신하고, 변경분이 있으면 자동 commit 한다.
+    # 이 산출물이 web/index.html 의 live status 패널을 채운다.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Regenerate web/data/status.json
+        run: |
+          mkdir -p web/data
+          python3 tools/ipflow.py status --json > web/data/status.json
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- web/data/status.json; then
+            echo "no change"
+            exit 0
+          fi
+          git config user.name  "ssd-soc-bot"
+          git config user.email "bot@acme-ssd"
+          git add web/data/status.json
+          git commit -m "chore(web): refresh status.json [skip ci]"
+          git push
+
+  deploy-pages:
+    # main push 이후 GitHub Pages 로 web/ 폴더를 배포한다.
+    needs: [refresh-web-status]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: web/ }
+      - id: deployment
+        uses: actions/deploy-pages@v4
 
   release-snapshot:
     if: startsWith(github.ref, 'refs/tags/sku-')

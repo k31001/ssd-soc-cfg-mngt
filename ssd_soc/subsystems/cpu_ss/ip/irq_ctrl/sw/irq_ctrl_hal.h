@@ -76,6 +76,18 @@ void irq_ctrl_enable(uint32_t src);
 void irq_ctrl_disable(uint32_t src);
 bool irq_ctrl_is_enabled(uint32_t src);
 
+/* source가 edge-triggered인지 query. EDGE_MASK는 RTL compile-time 상수이므로
+ * SoC integration package가 IRQ_CTRL_EDGE_MASK 매크로로 주입한다.
+ * 정의되지 않으면 전부 level (0)로 가정. */
+#ifndef IRQ_CTRL_EDGE_MASK
+#define IRQ_CTRL_EDGE_MASK 0u
+#endif
+static inline bool
+irq_ctrl_is_edge(uint32_t src)
+{
+    return (src < IRQ_CTRL_NUM_IRQ) && ((IRQ_CTRL_EDGE_MASK >> src) & 1u);
+}
+
 /* 전역 priority threshold (0..15). */
 void irq_ctrl_set_threshold(uint32_t thr);
 uint32_t irq_ctrl_get_threshold(void);

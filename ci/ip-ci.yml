@@ -41,6 +41,18 @@ jobs:
       - name: Render WaveDrom diagrams (check drift)
         run: bash tools/render-diagrams.sh --check .
 
+  workflow-validate:
+    # docs/WORKFLOW.md §3 의 closed-loop invariant 검사.
+    # DESIGN.md ↔ IP-XACT, IP-XACT ↔ HAL, Guide ↔ HAL,
+    # Guide ↔ scenarios, scenarios ↔ TB 의 cross-document 정합성을 모두 본다.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: ipflow validate (this IP)
+        run: python3 tools/ipflow.py validate .
+
   semver-bump-check:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -58,7 +70,7 @@ jobs:
         run: python3 .ci/sync_codeowners.py --repo . --check
 
   notify-manifest:
-    needs: [lint, yaml-schema, smoke-sim, diagram-drift]
+    needs: [lint, yaml-schema, smoke-sim, diagram-drift, workflow-validate]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
