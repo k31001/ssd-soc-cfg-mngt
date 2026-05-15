@@ -616,6 +616,72 @@ def cmd_scenarios(args) -> int:
     return 0
 
 
+def _detect_top_module(tb_file: Path) -> str:
+    """tb_<name>.sv 의 첫 'module <name>;' 을 추출. 없으면 파일 이름 기반 fallback."""
+    text = tb_file.read_text(encoding="utf-8", errors="ignore")
+    m = re.search(r"^\s*module\s+(\w+)\s*[;(]", text, re.MULTILINE)
+    return m.group(1) if m else tb_file.stem
+
+
+def run_verilator_sim(ip_dir: Path) -> CheckResult:
+    """verilator 가 PATH 에 있으면 본 IP 의 TB 를 빌드/실행하고 결과 판정."""
+    sim_dir = ip_dir / "sim"
+    rtl_dir = ip_dir / "rtl"
+    tb_files = list(sim_dir.glob("tb_*.sv"))
+    rtl_files = list(rtl_dir.glob("*.sv"))
+    if not tb_files or not rtl_files:
+        return CheckResult("verilator_sim", True, "no TB or RTL — skipped")
+
+    try:
+        subprocess.run(["verilator", "--version"], capture_output=True, check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return CheckResult("verilator_sim", True, "verilator not installed — skipped")
+
+    top = _detect_top_module(tb_files[0])
+    work = Path("/tmp") / f"ipflow_verilator_{ip_dir.name}"
+    if work.exists():
+        subprocess.run(["rm", "-rf", str(work)])
+    work.mkdir(parents=True)
+
+    cmd = [
+        "verilator", "--binary", "-sv",
+        "-Wno-DECLFILENAME", "-Wno-UNUSEDSIGNAL", "-Wno-INITIALDLY",
+        "-Wno-MULTIDRIVEN", "-Wno-TIMESCALEMOD", "-Wno-UNUSEDPARAM",
+        "--top-module", top, "--Mdir", str(work / "obj_dir"),
+        "-o", "Vsim",
+        "-j", "0",
+    ] + [str(p) for p in rtl_files] + [str(p) for p in tb_files]
+
+    build = subprocess.run(cmd, capture_output=True, text=True)
+    if build.returncode != 0:
+        return CheckResult("verilator_sim", False, f"build failed:\n{build.stderr[-500:]}")
+
+    run = subprocess.run([str(work / "obj_dir" / "Vsim")], capture_output=True, text=True)
+    out = run.stdout + run.stderr
+    # PASS criteria: "ALL TESTS PASSED" present AND no "FAIL" lines
+    passed = "ALL TESTS PASSED" in out and "[FAIL]" not in out
+    if passed:
+        n_pass = out.count("[ pass ]")
+        return CheckResult("verilator_sim", True, f"{n_pass} TB checks PASS")
+    n_fail = out.count("[FAIL]")
+    return CheckResult(
+        "verilator_sim", False,
+        f"{n_fail} TB check(s) FAILED — see {work}/obj_dir/Vsim output",
+    )
+
+
+def cmd_sim(args) -> int:
+    ip_dir = Path(args.ip).resolve()
+    if not ip_dir.is_dir():
+        print(f"no such directory: {ip_dir}", file=sys.stderr)
+        return 2
+    print(f"\n[ipflow sim] {ip_dir.relative_to(REPO_ROOT)}")
+    res = run_verilator_sim(ip_dir)
+    tag = "PASS" if res.passed else "FAIL"
+    print(f"  [{tag}] {res.name:<24} — {res.detail}\n")
+    return 0 if res.passed else 1
+
+
 def cmd_run(args) -> int:
     ip_dir = Path(args.ip).resolve()
     if not ip_dir.is_dir():
@@ -648,7 +714,16 @@ def cmd_run(args) -> int:
             return r.returncode
         subprocess.run(["make", "-C", str(sw_dir), "clean"], stdout=subprocess.DEVNULL)
 
-    print("\n[ipflow run] all host stages OK.\n")
+    # 4. RTL simulation (verilator) — 환경에 없으면 skip
+    if not getattr(args, "no_sim", False):
+        print("• stage: verilator-sim")
+        res = run_verilator_sim(ip_dir)
+        tag = "PASS" if res.passed else "FAIL"
+        print(f"  [{tag}] {res.name:<24} — {res.detail}")
+        if not res.passed:
+            return 1
+
+    print("\n[ipflow run] all stages OK.\n")
     return 0
 
 
@@ -672,9 +747,14 @@ def main(argv=None):
     p_sc.add_argument("ip", help="path to IP directory")
     p_sc.set_defaults(func=cmd_scenarios)
 
-    p_run = sub.add_parser("run", help="render diagrams + validate + host HAL test")
+    p_run = sub.add_parser("run", help="render diagrams + validate + host HAL test + RTL sim")
     p_run.add_argument("ip", help="path to IP directory")
+    p_run.add_argument("--no-sim", action="store_true", help="verilator 단계 건너뛰기")
     p_run.set_defaults(func=cmd_run)
+
+    p_sim = sub.add_parser("sim", help="run Verilator simulation on one IP's TB")
+    p_sim.add_argument("ip", help="path to IP directory")
+    p_sim.set_defaults(func=cmd_sim)
 
     args = p.parse_args(argv)
     return args.func(args)

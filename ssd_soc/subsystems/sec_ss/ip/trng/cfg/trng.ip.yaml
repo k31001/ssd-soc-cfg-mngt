@@ -1,15 +1,15 @@
 # IP metadata — IPLM-lite schema v1
-# 본 파일이 IP의 single source of truth. CODEOWNERS, manifest, CI가 모두 참조.
 name: trng
-version: 0.1.0           # semver. CI가 PR마다 bump 여부 확인
-status: proto            # proto | alpha | qual | gold
+version: 1.0.0           # first synthesizable / verified release
+status: alpha            # proto | alpha | qual | gold
 owner: @ssd-soc/security-team
 subsystem: sec_ss
 description: |
-  True Random Number Generator
-bus: apb               # axi | apb | ahb
+  True Random Number Generator (entropy source emulator + repetition
+  health test + 16-entry FIFO + APB SFR + edge-latched interrupt).
+bus: apb
 parameters:
-  RATE_MBPS: 100
+  FIFO_DEPTH: 16
 dependencies:
   - common-libs >= 1.0.0
 license: Apache-2.0
@@ -24,3 +24,15 @@ files:
     - rtl/trng.sv
   sim:
     - sim/tb_trng.sv
+  doc:
+    - doc/DESIGN.md
+    - doc/PROGRAMMERS_GUIDE.md
+    - doc/trng.ipxact.xml
+    - doc/diagrams/
+  sw:
+    - sw/trng_hal.h
+    - sw/trng_hal.c
+    - sw/test_hal_host.c
+    - sw/Makefile
+  verif:
+    - verif/scenarios.yaml

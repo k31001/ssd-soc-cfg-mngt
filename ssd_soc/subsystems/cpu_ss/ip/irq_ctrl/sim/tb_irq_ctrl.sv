@@ -80,35 +80,44 @@ module tb_irq_ctrl;
   endtask
 
   // ─── APB driver (2-cycle SETUP+ACCESS) ───
+  // task 내부 신호 구동은 blocking 으로 통일하고, prdata/pslverr 는
+  // ACCESS phase 중간(negedge)에 capture 한다 — 다음 posedge 에서 RTL 의
+  // NBA(예: CLAIM read 의 atomic clear) 가 fire 되기 전에 응답을 잡아야
+  // claim ID 등의 값이 일관된다. Verilator (NBA-as-blocking) 에서도 동일.
+  // 모든 signal transition을 posedge 직후 #1ns로 떼어내어 always_ff의 trigger
+  // sampling 과 race 하지 않도록 한다 — Verilator 의 비표준 NBA 처리 / 표준
+  // 시뮬레이터 양쪽에서 동일한 결과를 보장.
   task automatic apb_write(input logic [11:0] addr, input logic [31:0] data, output logic err);
-    @(posedge clk);
-    paddr   <= addr;
-    pwdata  <= data;
-    pwrite  <= 1'b1;
-    psel    <= 1'b1;
-    penable <= 1'b0;
-    @(posedge clk);
-    penable <= 1'b1;
-    @(posedge clk);
+    @(posedge clk); #1;
+    paddr   = addr;
+    pwdata  = data;
+    pwrite  = 1'b1;
+    psel    = 1'b1;
+    penable = 1'b0;
+    @(posedge clk); #1;
+    penable = 1'b1;
+    @(negedge clk);
     err     = pslverr;
-    psel    <= 1'b0;
-    penable <= 1'b0;
-    pwrite  <= 1'b0;
+    @(posedge clk); #1;
+    psel    = 1'b0;
+    penable = 1'b0;
+    pwrite  = 1'b0;
   endtask
 
   task automatic apb_read(input logic [11:0] addr, output logic [31:0] data, output logic err);
-    @(posedge clk);
-    paddr   <= addr;
-    pwrite  <= 1'b0;
-    psel    <= 1'b1;
-    penable <= 1'b0;
-    @(posedge clk);
-    penable <= 1'b1;
-    @(posedge clk);
+    @(posedge clk); #1;
+    paddr   = addr;
+    pwrite  = 1'b0;
+    psel    = 1'b1;
+    penable = 1'b0;
+    @(posedge clk); #1;
+    penable = 1'b1;
+    @(negedge clk);
     data    = prdata;
     err     = pslverr;
-    psel    <= 1'b0;
-    penable <= 1'b0;
+    @(posedge clk); #1;
+    psel    = 1'b0;
+    penable = 1'b0;
   endtask
 
   // Wrappers that ignore err

@@ -48,7 +48,7 @@ module irq_ctrl #(
   // ───────────────────────── Local params / regmap ─────────────────────────
   localparam int ID_W = $clog2(NUM_IRQ);
 
-  localparam logic [11:0] OFF_PRIO_BASE      = 12'h000; // 0x000..0x07C : 32 words
+  // PRIORITY array region: 0x000..0x07C — `is_prio_range` 가 이 비교만 사용.
   localparam logic [11:0] OFF_PRIO_LIMIT     = 12'h07C;
   localparam logic [11:0] OFF_PENDING        = 12'h100;
   localparam logic [11:0] OFF_PENDING_CLEAR  = 12'h104;

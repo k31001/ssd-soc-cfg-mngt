@@ -1,0 +1,9 @@
+{
+  "reg": [
+    { "name": "ENABLE",     "bits": 1, "attr": "RW" },
+    { "name": "SOFT_RESET", "bits": 1, "attr": "W1S self-clear" },
+    { "name": "SEED_LOAD",  "bits": 1, "attr": "W1S self-clear" },
+    { "bits": 29, "name": "rsvd", "type": 1 }
+  ],
+  "config": { "bits": 32, "lanes": 1, "hspace": 900 }
+}

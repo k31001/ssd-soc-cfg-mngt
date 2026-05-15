@@ -49,9 +49,10 @@ PyYAML 무의존 generic CLI. 25개 IP 어느 것에도 적용 가능.
 ```bash
 tools/ipflow.py status                                      # IP × stage 매트릭스
 tools/ipflow.py status --json > web/data/status.json        # 웹 대시보드 데이터
-tools/ipflow.py validate ssd_soc/subsystems/cpu_ss/ip/irq_ctrl   # 6개 closed-loop invariant 검사
-tools/ipflow.py scenarios ssd_soc/subsystems/cpu_ss/ip/irq_ctrl  # scenarios.yaml ↔ TB task 매칭
-tools/ipflow.py run ssd_soc/subsystems/cpu_ss/ip/irq_ctrl   # 도면 렌더 → validate → HAL smoke 일괄
+tools/ipflow.py validate <ip-dir>      # 6개 closed-loop invariant 검사
+tools/ipflow.py scenarios <ip-dir>     # scenarios.yaml ↔ TB task 매칭
+tools/ipflow.py sim <ip-dir>           # Verilator 로 self-checking TB 빌드/실행
+tools/ipflow.py run <ip-dir>           # 도면 렌더 → validate → HAL smoke → verilator sim 일괄
 ```
 
 자동 검사 항목 6종:
@@ -65,9 +66,18 @@ tools/ipflow.py run ssd_soc/subsystems/cpu_ss/ip/irq_ctrl   # 도면 렌더 → 
 | `scenarios_vs_guide`   | `scenarios.yaml` `guide_ref` ↔ 가이드 섹션 존재 여부      |
 | `scenarios_vs_tb`      | `scenarios.yaml` `tb_task` ↔ TB SV task / inline tag      |
 
-### Reference 구현: `cpu_ss/ip/irq_ctrl` (v1.0.0 alpha)
+### Reference 구현 (v1.0.0 alpha)
 
-위 9-stage 가 모두 채워진 유일한 IP. 다른 IP 를 발전시킬 때의 모범 사례.
+두 IP 가 9-stage 를 모두 통과한 상태. 다른 IP 를 발전시킬 때의 모범 사례.
+
+- **[`cpu_ss/ip/irq_ctrl`](ssd_soc/subsystems/cpu_ss/ip/irq_ctrl/)** — PLIC 계열
+  interrupt controller. 32 source / edge·level / threshold / claim-complete.
+  TB 29 checks PASS (verilator), HAL host smoke 16/16 PASS.
+- **[`sec_ss/ip/trng`](ssd_soc/subsystems/sec_ss/ip/trng/)** — True RNG (3-LFSR
+  entropy emulator + repetition health test + 16-entry FIFO + edge-latched
+  interrupt). TB 23 checks PASS (verilator), HAL host smoke 17/17 PASS.
+
+irq_ctrl 의 stage 별 산출물:
 
 | Stage | 산출물                                                                                            |
 |-------|---------------------------------------------------------------------------------------------------|
@@ -97,7 +107,7 @@ CI(`workflow-validate` job 의 `diagrams_drift`) 가 JSON ↔ SVG 동기화를
 | Workflow              | 트리거               | 동작                                                                 |
 |-----------------------|---------------------|----------------------------------------------------------------------|
 | `deploy-pages.yml`    | `main` push         | `status.json` 재생성 → WaveDrom 재렌더 → `web/` 폴더 GitHub Pages 배포 |
-| `ipflow-validate.yml` | PR / `main` push    | `scenarios.yaml` 이 있는 IP discover → 각 IP 의 6개 invariant 검사 + HAL host smoke |
+| `ipflow-validate.yml` | PR / `main` push    | `scenarios.yaml` 이 있는 IP discover → 각 IP 의 6개 invariant 검사 + HAL host smoke + **verilator TB 실행** |
 
 `ci/*.yml` 은 별개로 **각 IP/Subsystem repo 로 복사되는 템플릿** 이며 본
 monorepo 에서 직접 실행되지 않는다.

@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  trng 용 IP-XACT 1685-2014 component
+  Vendor : ssd-soc
+  Library: sec_ss
+  Name   : trng
+  Version: 1.0.0
+-->
+<ipxact:component xmlns:ipxact="http://www.accellera.org/XMLSchema/IPXACT/1685-2014"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://www.accellera.org/XMLSchema/IPXACT/1685-2014
+                                      http://www.accellera.org/XMLSchema/IPXACT/1685-2014/index.xsd">
+
+  <ipxact:vendor>ssd-soc</ipxact:vendor>
+  <ipxact:library>sec_ss</ipxact:library>
+  <ipxact:name>trng</ipxact:name>
+  <ipxact:version>1.0.0</ipxact:version>
+
+  <ipxact:memoryMaps>
+    <ipxact:memoryMap>
+      <ipxact:name>regs</ipxact:name>
+      <ipxact:description>trng 의 APB-mapped SFR (4 KiB window).</ipxact:description>
+
+      <ipxact:addressBlock>
+        <ipxact:name>trng_regs</ipxact:name>
+        <ipxact:baseAddress>0x0</ipxact:baseAddress>
+        <ipxact:range>4096</ipxact:range>
+        <ipxact:width>32</ipxact:width>
+        <ipxact:usage>register</ipxact:usage>
+        <ipxact:access>read-write</ipxact:access>
+
+        <!-- CTRL -->
+        <ipxact:register>
+          <ipxact:name>CTRL</ipxact:name>
+          <ipxact:description>Enable + self-clearing pulses (soft-reset / seed-load).</ipxact:description>
+          <ipxact:addressOffset>0x000</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00000000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>ENABLE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>SOFT_RESET</ipxact:name>
+            <ipxact:bitOffset>1</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>write-only</ipxact:access>
+            <ipxact:modifiedWriteValue>oneToSet</ipxact:modifiedWriteValue>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>SEED_LOAD</ipxact:name>
+            <ipxact:bitOffset>2</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>write-only</ipxact:access>
+            <ipxact:modifiedWriteValue>oneToSet</ipxact:modifiedWriteValue>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- STATUS -->
+        <ipxact:register>
+          <ipxact:name>STATUS</ipxact:name>
+          <ipxact:description>Live status bits (read-only).</ipxact:description>
+          <ipxact:addressOffset>0x004</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:field>
+            <ipxact:name>DATA_READY</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>FIFO_FULL</ipxact:name>
+            <ipxact:bitOffset>1</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>FIFO_EMPTY</ipxact:name>
+            <ipxact:bitOffset>2</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>HEALTH_FAIL</ipxact:name>
+            <ipxact:bitOffset>3</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- DATA -->
+        <ipxact:register>
+          <ipxact:name>DATA</ipxact:name>
+          <ipxact:description>Random word output. Read pop 으로 FIFO 한 word 꺼냄.</ipxact:description>
+          <ipxact:addressOffset>0x008</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:field>
+            <ipxact:name>WORD</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+            <ipxact:readAction>clear</ipxact:readAction>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- FIFO_LEVEL -->
+        <ipxact:register>
+          <ipxact:name>FIFO_LEVEL</ipxact:name>
+          <ipxact:description>현재 FIFO 에 저장된 word 수 (0..16).</ipxact:description>
+          <ipxact:addressOffset>0x00C</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:field>
+            <ipxact:name>LEVEL</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>5</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- HEALTH -->
+        <ipxact:register>
+          <ipxact:name>HEALTH</ipxact:name>
+          <ipxact:description>Repetition health test status.</ipxact:description>
+          <ipxact:addressOffset>0x010</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:field>
+            <ipxact:name>FAIL</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>REP_COUNT</ipxact:name>
+            <ipxact:bitOffset>8</ipxact:bitOffset>
+            <ipxact:bitWidth>4</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- SEED0 -->
+        <ipxact:register>
+          <ipxact:name>SEED0</ipxact:name>
+          <ipxact:description>LFSR0 seed (SEED_LOAD pulse 시 LFSR 로 로드).</ipxact:description>
+          <ipxact:addressOffset>0x014</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x80000001</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- SEED1 -->
+        <ipxact:register>
+          <ipxact:name>SEED1</ipxact:name>
+          <ipxact:description>LFSR1 seed.</ipxact:description>
+          <ipxact:addressOffset>0x018</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0xA5A5A5A5</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- SEED2 -->
+        <ipxact:register>
+          <ipxact:name>SEED2</ipxact:name>
+          <ipxact:description>LFSR2 seed.</ipxact:description>
+          <ipxact:addressOffset>0x01C</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0xC3C3C3C3</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- INTR_EN -->
+        <ipxact:register>
+          <ipxact:name>INTR_EN</ipxact:name>
+          <ipxact:description>Interrupt source enable mask.</ipxact:description>
+          <ipxact:addressOffset>0x020</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x0</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>DATA_READY_EN</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>HEALTH_FAIL_EN</ipxact:name>
+            <ipxact:bitOffset>1</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- INTR_STATUS -->
+        <ipxact:register>
+          <ipxact:name>INTR_STATUS</ipxact:name>
+          <ipxact:description>Edge-latched interrupt status (W1C).</ipxact:description>
+          <ipxact:addressOffset>0x024</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-write</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x0</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>DATA_READY_LATCH</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+            <ipxact:modifiedWriteValue>oneToClear</ipxact:modifiedWriteValue>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>HEALTH_FAIL_LATCH</ipxact:name>
+            <ipxact:bitOffset>1</ipxact:bitOffset>
+            <ipxact:bitWidth>1</ipxact:bitWidth>
+            <ipxact:access>read-write</ipxact:access>
+            <ipxact:modifiedWriteValue>oneToClear</ipxact:modifiedWriteValue>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- IP_ID -->
+        <ipxact:register>
+          <ipxact:name>IP_ID</ipxact:name>
+          <ipxact:description>IP 식별자 상수 ("TRNG" = 0x54524E47).</ipxact:description>
+          <ipxact:addressOffset>0x030</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x54524E47</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>VALUE</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>32</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+        <!-- IP_VERSION -->
+        <ipxact:register>
+          <ipxact:name>IP_VERSION</ipxact:name>
+          <ipxact:description>Version 상수: {major[15:8], minor[7:0], patch[7:0]} = 1.0.0.</ipxact:description>
+          <ipxact:addressOffset>0x034</ipxact:addressOffset>
+          <ipxact:size>32</ipxact:size>
+          <ipxact:access>read-only</ipxact:access>
+          <ipxact:reset>
+            <ipxact:value>0x00010000</ipxact:value>
+            <ipxact:mask>0xFFFFFFFF</ipxact:mask>
+          </ipxact:reset>
+          <ipxact:field>
+            <ipxact:name>MAJOR</ipxact:name>
+            <ipxact:bitOffset>16</ipxact:bitOffset>
+            <ipxact:bitWidth>8</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>MINOR</ipxact:name>
+            <ipxact:bitOffset>8</ipxact:bitOffset>
+            <ipxact:bitWidth>8</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+          <ipxact:field>
+            <ipxact:name>PATCH</ipxact:name>
+            <ipxact:bitOffset>0</ipxact:bitOffset>
+            <ipxact:bitWidth>8</ipxact:bitWidth>
+            <ipxact:access>read-only</ipxact:access>
+          </ipxact:field>
+        </ipxact:register>
+
+      </ipxact:addressBlock>
+    </ipxact:memoryMap>
+  </ipxact:memoryMaps>
+
+  <ipxact:model>
+    <ipxact:ports>
+      <ipxact:port><ipxact:name>clk</ipxact:name><ipxact:wire><ipxact:direction>in</ipxact:direction></ipxact:wire></ipxact:port>
+      <ipxact:port><ipxact:name>rst_n</ipxact:name><ipxact:wire><ipxact:direction>in</ipxact:direction></ipxact:wire></ipxact:port>
+      <ipxact:port><ipxact:name>irq_o</ipxact:name><ipxact:wire><ipxact:direction>out</ipxact:direction></ipxact:wire></ipxact:port>
+    </ipxact:ports>
+  </ipxact:model>
+
+  <ipxact:fileSets>
+    <ipxact:fileSet>
+      <ipxact:name>rtl_files</ipxact:name>
+      <ipxact:file>
+        <ipxact:name>../rtl/trng.sv</ipxact:name>
+        <ipxact:fileType>systemVerilogSource</ipxact:fileType>
+      </ipxact:file>
+    </ipxact:fileSet>
+  </ipxact:fileSets>
+
+</ipxact:component>

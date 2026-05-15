@@ -1,0 +1,15 @@
+{
+  "signal": [
+    { "name": "clk",                "wave": "p........." },
+    { "name": "ENABLE | SEED_LOAD", "wave": "01........" },
+    { "name": "candidate_q",        "wave": "x.========", "data": ["0","0","0","0","0","0","0","0"] },
+    { "name": "rep_match",          "wave": "0..1......" },
+    { "name": "rep_count_q",        "wave": "=..=.=.=.=", "data": ["0","1","2","3","3"] },
+    { "name": "HEALTH.FAIL",        "wave": "0........1", "node": ".........a" },
+    { "name": "INTR_STATUS[1]",     "wave": "0........1", "node": ".........b" },
+    { "name": "irq_o",              "wave": "0........1" }
+  ],
+  "edge": [ "a-b rising-edge latch" ],
+  "head": { "text": "SEED=0 강제 시 repetition test: 4-cycle 후 HEALTH.FAIL latch + irq rise" },
+  "config": { "hscale": 1 }
+}

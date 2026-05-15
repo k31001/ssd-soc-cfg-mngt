@@ -1,0 +1,108 @@
+# trng verification scenarios — closed-loop manifest
+# WORKFLOW.md §2 Stage 7 산출물. PROGRAMMERS_GUIDE.md §6 worked example
+# 과 RTL 기능을 1:1 매핑.
+
+ip: trng
+version: 1.0.0
+
+scenarios:
+  - id: S01
+    name: reset_state
+    guide_ref: "§2"
+    rtl_features: [reset, regfile_default]
+    summary: "Reset 직후 CTRL=0, FIFO empty, irq=0"
+    tb_task: inline:T1
+
+  - id: S02
+    name: id_version_readback
+    guide_ref: "§9"
+    rtl_features: [ro_regs, ip_id, ip_version]
+    summary: "IP_ID / IP_VERSION 상수 readback"
+    tb_task: inline:T2
+
+  - id: S03
+    name: enable_fill_fifo
+    guide_ref: "§3"
+    rtl_features: [lfsr, fifo_push, data_ready]
+    summary: "ENABLE 후 FIFO 16 word 채워지고 DATA_READY/FIFO_FULL 1"
+    tb_task: inline:T3
+
+  - id: S04
+    name: data_pop
+    guide_ref: "§6"
+    rtl_features: [fifo_pop, data_register]
+    summary: "DATA read 가 매번 다른 word 반환, FIFO_LEVEL 감소"
+    tb_task: inline:T4
+
+  - id: S05
+    name: seed_reuse_reproducible
+    guide_ref: "§6"
+    rtl_features: [seed_load, soft_reset, lfsr_determinism]
+    summary: "동일 SEED + SOFT_RESET+SEED_LOAD 재인가 시 같은 stream"
+    tb_task: inline:T5
+
+  - id: S06
+    name: soft_reset_clears_fifo
+    guide_ref: "§5"
+    rtl_features: [soft_reset, fifo_clear]
+    summary: "SOFT_RESET pulse 가 health_fail/rep_count 초기화, ENABLE 보존"
+    tb_task: inline:T6
+
+  - id: S07
+    name: health_fail_repetition
+    guide_ref: "§6"
+    rtl_features: [health_test, repetition_detect, irq]
+    summary: "SEED=0 → 4-cycle 후 HEALTH.FAIL latch + irq_o rise"
+    tb_task: inline:T7
+
+  - id: S08
+    name: intr_status_w1c
+    guide_ref: "§4"
+    rtl_features: [intr_edge_latch, w1c, irq]
+    summary: "INTR_STATUS W1C 후 비트 클리어, irq_o 떨어짐"
+    tb_task: inline:T8
+
+  - id: S09
+    name: pslverr_unmapped
+    guide_ref: "§7"
+    rtl_features: [apb_pslverr, addr_decode]
+    summary: "미매핑 주소 read 시 pslverr=1"
+    tb_task: inline:T9
+
+  - id: S10
+    name: pslverr_ro_write
+    guide_ref: "§7"
+    rtl_features: [apb_pslverr, ro_protection]
+    summary: "STATUS / IP_ID write 시 pslverr=1"
+    tb_task: inline:T10
+
+guide_example_mapping:
+  "§6.1 polling":            [S03, S04]
+  "§6.2 32B key material":   [S03, S04]
+  "§6.3 KAT reproducible":   [S05]
+  "§6.4 health-fail inject": [S07, S08]
+
+rtl_features_required:
+  - reset
+  - regfile_default
+  - regfile_rw
+  - lfsr
+  - fifo_push
+  - fifo_pop
+  - fifo_clear
+  - data_register
+  - data_ready
+  - soft_reset
+  - seed_load
+  - lfsr_determinism
+  - health_test
+  - repetition_detect
+  - intr_edge_latch
+  - w1c
+  - irq
+  - apb_pslverr
+  - addr_decode
+  - ro_protection
+  - ro_regs
+  - ip_id
+  - ip_version

@@ -1,0 +1,15 @@
+{
+  "signal": [
+    { "name": "clk",            "wave": "p..........." },
+    { "name": "CTRL.ENABLE",    "wave": "01.........." },
+    { "name": "candidate_new",  "wave": "x.=========..", "data": ["W0","W1","W2","W3","W4","W5","W6","W7","W8"] },
+    { "name": "fifo_count_q",   "wave": "=.=========..", "data": ["0","1","2","3","4","5","6","7","8","9"] },
+    { "name": "STATUS.DATA_READY", "wave": "0.1........." },
+    {},
+    { "name": "APB R DATA",     "wave": "0........10..", "node": "..........a" },
+    { "name": "fifo_count_q'",  "wave": "=.=========.=", "data": ["0","1","2","3","4","5","6","7","8","9","8"], "node": "...........b" }
+  ],
+  "edge": [ "a->b pop ↓1" ],
+  "head": { "text": "Enable 후 FIFO fill, 그 후 DATA read 시 pop" },
+  "config": { "hscale": 1 }
+}

@@ -412,18 +412,18 @@
       "name": "trng",
       "path": "ssd_soc/subsystems/sec_ss/ip/trng",
       "subsystem": "sec_ss",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "stages": {
         "spec": true,
-        "rtl": false,
-        "design": false,
-        "ipxact": false,
-        "guide": false,
-        "hal": false,
-        "scenarios": false,
-        "sim": false
+        "rtl": true,
+        "design": true,
+        "ipxact": true,
+        "guide": true,
+        "hal": true,
+        "scenarios": true,
+        "sim": true
       },
-      "percent": 12
+      "percent": 100
     }
   ],
   "stages": [
