@@ -152,6 +152,9 @@ cd web && python3 -m http.server 8000   # http://localhost:8000
 - ⭐ [**IP Closed-Loop Workflow**](docs/WORKFLOW.md) — 9-stage 폐쇄 루프
   정의, invariant 표, harness 명령. 인터랙티브 시각 자료는
   [k31001.github.io/ssd-soc-cfg-mngt](https://k31001.github.io/ssd-soc-cfg-mngt/).
+- 📊 [**Verification Report**](docs/VERIFICATION_REPORT.md) — 두 reference
+  IP (`irq_ctrl`, `trng`) 의 L1/L2/L3 검증 결과 종합. 52/52 TB checks +
+  33/33 HAL smoke + 12/12 closed-loop invariants PASS.
 
 ---
 
