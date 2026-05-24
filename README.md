@@ -6,8 +6,12 @@ git 전략 비교를 넘어, 하나의 IP 가 spec 부터 verification 까지 �
 **closed-loop workflow** 와 그것을 자동 검증하는 harness 까지를 함께
 제공한다.
 
-> **Live dashboard:** <https://k31001.github.io/ssd-soc-cfg-mngt/>
-> — 9-stage workflow 시각화 + 25개 IP × 8 stage live status matrix.
+> **Live URLs** (GitHub Pages — `web/` 배포):
+> - 🏠 <https://k31001.github.io/ssd-soc-cfg-mngt/> — 9-stage workflow 대시보드 + 25개 IP × 8 stage status matrix
+> - 📘 <https://k31001.github.io/ssd-soc-cfg-mngt/report/> — **AI 친화 SoC 산출물 관리** 제안 보고서 (12장)
+> - ▶ <https://k31001.github.io/ssd-soc-cfg-mngt/present/> — 20장 발표 슬라이드 (`←/→` nav · `N` 노트 · `F` 풀스크린 · `P` 인쇄)
+>
+> 로컬 미리보기: `make report-serve` → http://localhost:8000/
 
 ---
 

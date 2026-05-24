@@ -6,3 +6,7 @@ obj_dir/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Proposal report viewer mirror — auto-synced from docs/proposal/ by
+# `make report-sync` 또는 deploy-pages CI step.
+web/report/content/

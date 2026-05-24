@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 친화 SoC 산출물 관리 — Markdown · Git · Submodule · RTL-Grounded</title>
+  <link rel="stylesheet" href="present.css" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<div id="deck">
+
+<!-- ─────────────────── 01. Title ─────────────────── -->
+<section class="slide title-slide active">
+  <div class="kicker">SoC 설계·검증 프로세스의 AI 전환 — 산출물 관리 전략</div>
+  <h1 class="title">코드 옆에 사는 문서.<br/>RTL을 진실로,<br/>CI를 정합성으로.</h1>
+  <p class="subtitle">Markdown · Git · Submodule · RTL-Grounded — 그것이면 충분하다.</p>
+  <div class="author">Proposal · 2026 · soc-cfg-mngt</div>
+  <div class="notes">
+    오프닝. "오늘은 우리가 어떻게 SoC 산출물을 AI 시대에 맞는 형태로 관리할지에 대한 제안입니다.
+    핵심 메시지는 단 한 줄. 모든 산출물은 마크다운, 모두 git, 문서 저장소는 submodule, RTL은 single source of truth, 정합성은 CI."
+  </div>
+</section>
+
+<!-- ─────────────────── 02. TL;DR ─────────────────── -->
+<section class="slide">
+  <div class="kicker">TL;DR — 한 장 요약</div>
+  <h1>"문서가 코드 옆에 살고, AI가 그 문서를 직접 읽고,<br/>CI가 그 정합성을 검사한다."</h1>
+  <div class="cols-2" style="margin-top:32px">
+    <div class="card">
+      <h4>우리의 선택</h4>
+      <ul>
+        <li><strong>3-repo</strong>: RTL · Doc · FW (단방향 submodule FW→Doc)</li>
+        <li><strong>Markdown</strong> + Mermaid + WaveDrom · IP-XACT</li>
+        <li><strong>5종 문서 산출물</strong> (HLD/DLD/PG/SFR/HAL.h)</li>
+        <li><strong>RTL</strong>을 single source of truth로</li>
+        <li><strong>FW + Python coverif</strong> on FPGA · Veloce · Zebu</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>배제한 것</h4>
+      <ul>
+        <li>Confluence · DOCX · PDF (정합성 검증 불가)</li>
+        <li>단일 super-repo (권한 분리 곤란)</li>
+        <li>벡터DB · 임베딩 RAG (재인덱싱 · 청크 · 환각)</li>
+        <li>MCP 문서검색 (토큰·latency 폭증)</li>
+        <li>EDA 벤더 AI 락인</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot">SLIDE 02 — TL;DR</div>
+  <div class="notes">
+    한 줄: "문서가 코드 옆에 살고…". 왼쪽은 우리가 채택하는 5개, 오른쪽은 배제하는 5개.
+    각각의 정당화는 이후 슬라이드에서 다룸.
+  </div>
+</section>
+
+<!-- ─────────────────── 03. 문제 — 산출물 분산 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">문제 정의 · 1 / 4</div>
+  <h2>지금의 SoC 산출물 — 6개 시스템에 흩어져 산다</h2>
+  <pre><code>SoC Spec.docx           ─ SharePoint
+HLD / DLD.docx          ─ Confluence (export)
+SFR 주소맵.xlsx         ─ Confluence 표 + 별첨
+PROGRAMMERS_GUIDE.pdf   ─ Confluence wiki
+HAL 헤더.h              ─ Bitbucket
+RTL.sv                  ─ 별도 Git
+Test scenarios.docx     ─ Jira 첨부
+회의록 · 결정사항         ─ Confluence</code></pre>
+  <p class="lead" style="margin-top:18px">
+    cross-reference 질문 ("이 시나리오가 어떤 가이드의 어떤 절을 만족시키나?") →
+    <strong>사람이 직접 추적</strong>.
+  </p>
+  <p>LLM이 진입하면 두 가지 비용이 즉시 발생: <strong>임베딩·검색 인프라</strong>와 <strong>토큰 폭증</strong>.</p>
+  <div class="foot">SLIDE 03 — 산출물 분산</div>
+  <div class="notes">
+    현장에서 자주 보이는 상태를 그대로 나열. 핵심은 "cross-reference가 사람의 일"이라는 점.
+    이 슬라이드를 보면서 청중은 자기 팀의 상황을 떠올리게 됨.
+  </div>
+</section>
+
+<!-- ─────────────────── 04. 문제 — RAG/벡터DB ─────────────────── -->
+<section class="slide">
+  <div class="kicker">문제 정의 · 2 / 4</div>
+  <h2>임베딩 RAG는 코드·SoC 도메인에서 무너진다</h2>
+  <div class="cols-3">
+    <div class="card">
+      <h4>① 재인덱싱 오버헤드</h4>
+      <p>RTL 변경 때마다 임베딩 갱신. 지연되면 LLM이 <strong>삭제된 함수를 호출</strong>하는 코드를 생성.</p>
+    </div>
+    <div class="card">
+      <h4>② 청킹 정합성 손실</h4>
+      <p>IP-XACT XML, register map 표는 <strong>전체로서만</strong> 의미. 청크가 잘리면 환각.</p>
+    </div>
+    <div class="card">
+      <h4>③ 의미 유사도의 잡음</h4>
+      <p><code>IRQ_EN</code>과 <code>INT_ENABLE</code>은 의미적으로 유사 — 그러나 <strong>버그</strong>를 만든다.</p>
+    </div>
+  </div>
+  <blockquote style="margin-top:22px">
+    "Most enterprise RAG failures stem from <strong>context quality</strong>, not retrieval recall."
+    <span class="source">— Unblocked, "Context Engine vs RAG"</span>
+  </blockquote>
+  <div class="foot">SLIDE 04 — RAG의 3대 약점</div>
+  <div class="notes">
+    벡터DB의 약점 3가지를 카드로 명료하게. 인용은 RAG 업계 자체의 진단.
+  </div>
+</section>
+
+<!-- ─────────────────── 05. 문제 — MCP / 토큰 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">문제 정의 · 3 / 4</div>
+  <h2>MCP 문서검색은 토큰과 latency를 폭증시킨다</h2>
+  <table>
+    <thead><tr><th>단계</th><th>비용</th></tr></thead>
+    <tbody>
+      <tr><td>MCP search call</td><td>API round-trip + 인증 토큰</td></tr>
+      <tr><td>검색 후보 N개 fetch</td><td>N × HTML→markdown 변환 + 페이로드 토큰</td></tr>
+      <tr><td>LLM 컨텍스트 주입</td><td>무관·중복 청크 다수, 노이즈 토큰 소비</td></tr>
+      <tr class="hl"><td><strong>결과</strong></td><td>환각 또는 "더 알아봐야" 회피 응답</td></tr>
+    </tbody>
+  </table>
+  <div class="cols-3" style="margin-top:22px">
+    <div class="card">
+      <div class="num">5–20×</div>
+      <div class="label">직접 read 대비 토큰 사용 (단일 질의)</div>
+    </div>
+    <div class="card">
+      <div class="num">수백 ms ~ 수 초</div>
+      <div class="label">MCP 호출 1회 평균 latency</div>
+    </div>
+    <div class="card">
+      <div class="num">변동</div>
+      <div class="label">같은 질의 → 다른 답 (인덱스 상태 의존)</div>
+    </div>
+  </div>
+  <div class="foot">SLIDE 05 — MCP 비용</div>
+  <div class="notes">
+    MCP의 비용을 단계별로 분해. 토큰 5–20x는 도메인에 따라 다르지만 평균적 패턴.
+    핵심: 검색이 잘 되더라도 비용 구조가 본질적으로 무겁다.
+  </div>
+</section>
+
+<!-- ─────────────────── 06. 문제 — drift ─────────────────── -->
+<section class="slide">
+  <div class="kicker">문제 정의 · 4 / 4</div>
+  <h2>가장 본질적인 문제 — 문서 ↔ RTL 정합성이 사람에게 달려 있다</h2>
+  <table>
+    <thead><tr><th>시나리오</th><th>현실</th></tr></thead>
+    <tbody>
+      <tr><td>RTL의 SFR 비트 폭 변경</td><td>가이드·헤더·테스트벤치 따로 누락</td></tr>
+      <tr><td>새 IP 추가</td><td>5종 문서를 5번 작성 (저자·시스템·포맷 모두 분리)</td></tr>
+      <tr><td>Spec change</td><td>영향 범위를 누구도 단언 못함</td></tr>
+      <tr><td>신규 SoC 파생</td><td>Base SoC 산출물을 수동 복사·수정</td></tr>
+    </tbody>
+  </table>
+  <blockquote>
+    일정 시점이 지나면 <strong>문서를 더 이상 믿지 못하는 단계</strong>가 된다.
+    팀은 다시 RTL을 직접 읽기 시작 — 산출물의 존재 의의가 사라진다.
+    <span class="source">— "Documentation drift"의 결말</span>
+  </blockquote>
+  <div class="foot">SLIDE 06 — 정합성 붕괴</div>
+  <div class="notes">
+    임원도 알지만 표면화하기 어려운 문제. "문서를 못 믿게 되는 순간"이라는 표현이 가장 자극적.
+    이 슬라이드 끝에서 "그래서 우리가 풀어야 할 단 하나의 질문은?"으로 연결.
+  </div>
+</section>
+
+<!-- ─────────────────── 07. 가설 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">우리의 가설</div>
+  <h1 style="margin-top:14vh">RTL을 single source of truth로 두고,<br/>
+    모든 산출물은 그것의 그림자로 자동 동기화되며,<br/>
+    AI는 그 산출물을 결정론적으로 읽는다.</h1>
+  <p class="subtitle">이 가설이 성립한다면, 4개 빌딩블록만 있으면 된다.</p>
+  <ul style="margin-top:28px; font-size:24px">
+    <li>① <strong>Markdown</strong> — git-friendly, diff 가능, AI 토큰 최효율</li>
+    <li>② <strong>Git + Submodule</strong> — tag·branch 결정론적 버전, 권한 분리</li>
+    <li>③ <strong>IEEE 1685-2022 IP-XACT</strong> — SFR의 국제 표준</li>
+    <li>④ <strong>RTL-Grounded CI</strong> — invariant 검사로 정합성을 빌드 시스템에 위임</li>
+  </ul>
+  <div class="foot">SLIDE 07 — 가설</div>
+  <div class="notes">
+    문제에서 해답으로 넘어가는 슬라이드. 가설을 한 문장으로 압축하고, 4개 빌딩블록을 미리 보여줌.
+    "이 4개는 새로 만들 게 아니라 이미 있는 것"이라는 점을 강조.
+  </div>
+</section>
+
+<!-- ─────────────────── 08. 제안 아키텍처 — 3-repo ─────────────────── -->
+<section class="slide">
+  <div class="kicker">제안</div>
+  <h2>한 장의 아키텍처 — 3개 저장소 + 단방향 submodule</h2>
+  <div class="mermaid">
+flowchart LR
+    subgraph R1["① RTL Repo"]
+      r1a[rtl/**/*.sv]
+      r1b["lint · synth"]
+    end
+    subgraph R2["② Doc Repo (tag-released)"]
+      r2a["HLD / DLD<br/>PROGRAMMERS_GUIDE"]:::contract
+      r2b["*.ipxact.xml<br/>(SFR)"]
+      r2c["include/&lt;ip&gt;_hal.h<br/>(auto-gen)"]
+    end
+    subgraph R3["③ FW Repo (consumes Doc as submodule)"]
+      r3a["fw/hal/*.c<br/>fw/drivers · fw/app"]
+      r3b["tests/scenarios/*.py<br/>(Python coverif)"]
+      r3c["doc/ ← submodule (tag pin)"]:::contract
+    end
+    subgraph HW["검증 플랫폼"]
+      hw1[FPGA]
+      hw2["Veloce / Zebu"]
+    end
+    r1a -. "synth / emulate" .-> hw1
+    r1a -. "synth / emulate" .-> hw2
+    r1a ==>|"Doc CI<br/>read-only fetch"| r2a
+    r2a ==>|"submodule update<br/>(tag pin)"| r3c
+    r2c ==>|"submodule update"| r3a
+    r3a --> r3b
+    r3b -. "Python이 FW 구동" .-> hw1
+    r3b -. "Python이 FW 구동" .-> hw2
+    classDef contract fill:#fdf6b2,stroke:#b58900,stroke-width:2px,color:#1a1300;
+  </div>
+  <p class="lead">노란 블록 = <strong>SW-HW 계약</strong>. Doc Repo 한 곳에서 만들어 FW Repo가 tag로 핀.</p>
+  <div class="foot">SLIDE 08 — 3-repo 아키텍처</div>
+  <div class="notes">
+    핵심 관찰점:
+    1) 3개 저장소가 독립적이고 권한이 자연스럽게 분리됨.
+    2) Submodule은 한 방향 — FW → Doc. RTL은 submodule이 아니라 Doc CI가 fetch해서 참조.
+    3) 검증 플랫폼은 SV TB가 아니라 FPGA + Veloce/Zebu. Python이 펌웨어를 구동.
+    4) "어느 RTL × 어느 doc × 어느 FW로 측정했나"가 항상 한 줄로 확정됨.
+  </div>
+</section>
+
+<!-- ─────────────────── 09. 4 빌딩블록 정당화 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">4개 빌딩블록</div>
+  <h2>각각이 이미 산업 표준이다</h2>
+  <table>
+    <thead><tr><th>빌딩블록</th><th>우리 선택</th><th>산업 근거</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>① 문서 포맷</strong></td>
+        <td>Markdown + Mermaid + WaveDrom</td>
+        <td>Docs-as-Code (수백 OSS 프로젝트), Diátaxis 권장 도구</td>
+      </tr>
+      <tr>
+        <td><strong>② 저장소 모델</strong></td>
+        <td>RTL · Doc · FW 3-repo + 단방향 submodule (FW→Doc, tag-pinned)</td>
+        <td>본 레포 <code>cm-strategies/</code> 4전략 비교 결론</td>
+      </tr>
+      <tr>
+        <td><strong>③ SFR 표준</strong></td>
+        <td>IEEE 1685-2022 IP-XACT</td>
+        <td>2022-09 IEEE SA 승인 · Accellera 보충 2023-06</td>
+      </tr>
+      <tr>
+        <td><strong>④ 검색·정합성</strong></td>
+        <td>grep / ripgrep + harness invariant</td>
+        <td>Anthropic Claude Code의 RAG → grep 전환 (정밀·단순·신선·privacy)</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="lead">우리가 발명하는 것은 없다. <strong>4개를 하나의 워크플로우로 묶을 뿐</strong>.</p>
+  <div class="foot">SLIDE 09 — 4 빌딩블록</div>
+  <div class="notes">
+    "새로 발명한 게 없다"는 점이 임원·리더에게 안심을 준다. 모두 산업 표준 위에 있음.
+  </div>
+</section>
+
+<!-- ─────────────────── 10. 산출물 5종 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">산출물 분류 — Diátaxis × SoC</div>
+  <h2>5종 산출물은 Diátaxis 4분면의 SoC 특화 매핑</h2>
+  <table>
+    <thead><tr><th>#</th><th>산출물</th><th>포맷</th><th>저장소</th><th>Diátaxis</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><strong>HLD</strong> High Level Description</td><td>Markdown + Mermaid</td><td>Doc Repo</td><td>Explanation</td></tr>
+      <tr><td>2</td><td><strong>DLD</strong> (= DESIGN.md)</td><td>Markdown + Mermaid + WaveDrom</td><td>Doc Repo</td><td>Explanation + Reference</td></tr>
+      <tr class="hl"><td>3</td><td><strong>Programmer's Guide</strong></td><td>Markdown</td><td>Doc Repo</td><td>Tutorials + How-to</td></tr>
+      <tr><td>4</td><td><strong>SFR</strong> (IP-XACT)</td><td>XML (IEEE 1685-2022)</td><td>Doc Repo</td><td>Reference (기계 판독)</td></tr>
+      <tr><td>5</td><td><strong>HAL.h</strong> (auto-gen from SFR)</td><td>C 헤더 + Doxygen</td><td>Doc Repo</td><td>Reference</td></tr>
+      <tr><td>+</td><td><strong>HAL.c · Python scenarios</strong></td><td>C / Python</td><td>FW Repo</td><td>실행·검증 산출물</td></tr>
+    </tbody>
+  </table>
+  <p class="lead" style="margin-top:14px">
+    1–5는 <strong>Doc Repo가 단일 출처</strong>. FW Repo가 <code>doc/</code> submodule로 소비하여 HAL.c와 Python coverif를 얹는다.
+  </p>
+  <div class="foot">SLIDE 10 — 산출물 5종</div>
+  <div class="notes">
+    "왜 5종?"이라는 질문에 즉답: Diátaxis의 SoC 자연 매핑. 자의적 분류가 아님.
+    Programmer's Guide가 SW-HW 계약이라는 점이 다음 슬라이드의 invariant로 연결.
+  </div>
+</section>
+
+<!-- ─────────────────── 11. invariant — 저장소별 분리 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">정합성 CI</div>
+  <h2>저장소별 invariant — Doc Repo CI · FW Repo CI</h2>
+  <div class="cols-2">
+    <div class="card">
+      <h4>② Doc Repo CI</h4>
+      <table style="font-size:15px">
+        <thead><tr><th>#</th><th>Invariant</th></tr></thead>
+        <tbody>
+          <tr><td>D1</td><td>RTL ↔ DLD §5 register map</td></tr>
+          <tr><td>D2</td><td>DLD §5 ↔ IP-XACT</td></tr>
+          <tr><td>D3</td><td>IP-XACT ↔ HAL.h (auto-gen)</td></tr>
+          <tr><td>D4</td><td>Diagram source ↔ SVG</td></tr>
+          <tr><td>D5</td><td>HAL.h ↔ Guide §6 함수 시그너처</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:15px; color:var(--muted); margin-top:6px">
+        RTL Repo를 <strong>read-only fetch</strong>하여 D1 검사. PR pass → 새 doc-tag.
+      </p>
+    </div>
+    <div class="card">
+      <h4>③ FW Repo CI</h4>
+      <table style="font-size:15px">
+        <thead><tr><th>#</th><th>Invariant</th></tr></thead>
+        <tbody>
+          <tr><td>F1</td><td>HAL.c export ↔ HAL.h (submodule)</td></tr>
+          <tr><td>F2</td><td>Python scenarios ↔ Guide §6 worked example</td></tr>
+          <tr><td>F3</td><td>Python regression ↔ Guide §8 pitfall</td></tr>
+          <tr><td>F4</td><td><code>doc/</code> submodule SHA 단조 증가</td></tr>
+          <tr><td>F5</td><td>Host smoke pass (make test)</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:15px; color:var(--muted); margin-top:6px">
+        Doc submodule 갱신 직후 자동 실행. <strong>nightly: FPGA/Veloce/Zebu</strong> 위에서 Python scenario regress.
+      </p>
+    </div>
+  </div>
+  <blockquote style="margin-top:14px">
+    어느 하나라도 깨지면 <strong>해당 저장소 PR이 자동 fail</strong>. 사람의 성실성에 의존하지 않는다.
+    <span class="source">— 본 레포 <code>tools/ipflow.py</code>가 한 저장소 내에서 동일 invariant 체크를 실증 (irq_ctrl·trng 두 IP에서 PASS)</span>
+  </blockquote>
+  <div class="foot">SLIDE 11 — D/F invariants</div>
+  <div class="notes">
+    invariant가 두 저장소에 분리되는 게 핵심. Doc Repo는 RTL과 문서의 일치를, FW Repo는 그 문서(submodule)와 펌웨어·시나리오의 일치를 봄.
+    "PR 시점에 자동 차단"이 본 제안의 가장 차별적 부분.
+  </div>
+</section>
+
+<!-- ─────────────────── 12. AI 자동 생성 4 시나리오 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">AI 자동 생성</div>
+  <h2>AI는 정합성 잡일을 흡수하고, 사람은 의도 정의에 집중</h2>
+  <table>
+    <thead><tr><th>#</th><th>저장소</th><th>입력 (read)</th><th>출력 (write)</th><th>검증 게이트</th></tr></thead>
+    <tbody>
+      <tr><td>A</td><td>Doc Repo</td><td>RTL Repo의 *.sv (fetch) + DLD §5</td><td>*.ipxact.xml</td><td>D1 / D2</td></tr>
+      <tr><td>B</td><td>Doc Repo</td><td>*.ipxact.xml</td><td><code>include/&lt;ip&gt;_hal.h</code> (auto-gen)</td><td>D3</td></tr>
+      <tr><td>C</td><td>FW Repo</td><td>HAL.h + Guide §6 (submodule)</td><td><code>fw/hal/*_hal.c</code></td><td>F1 + host smoke</td></tr>
+      <tr><td>D</td><td>FW Repo</td><td>Guide §6, §8 (submodule)</td><td><code>tests/scenarios/*.py</code> (Python coverif)</td><td>F2 / F3</td></tr>
+    </tbody>
+  </table>
+  <div class="cols-2" style="margin-top:18px">
+    <div class="card">
+      <h4>✅ AI가 자동 생성</h4>
+      <ul>
+        <li>IP-XACT XML, HAL.h (Doc Repo)</li>
+        <li>HAL.c 초안 (FW Repo)</li>
+        <li><strong>Python coverif scenarios</strong> (FW Repo)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>🛑 AI가 자동 수정 안 함</h4>
+      <ul>
+        <li>RTL Repo의 <code>*.sv</code> — 의도가 농축됨</li>
+        <li>DLD §1–4 (설계 의도)</li>
+        <li>Programmer's Guide (저자=SW lead)</li>
+        <li>Python scenario의 측정·assertion 의도 (DV 리뷰)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot">SLIDE 12 — AI 자동 생성 4 시나리오</div>
+  <div class="notes">
+    AI가 무엇을 하고 무엇을 안 하는지 명확히. boundary가 중요.
+    "AI는 사실 정합성을 자동화, 의도는 사람이 정의" 원칙.
+  </div>
+</section>
+
+<!-- ─────────────────── 13. RAG vs Submodule ─────────────────── -->
+<section class="slide">
+  <div class="kicker">AI 컨텍스트 주입의 두 가지 방식</div>
+  <h2>RAG/MCP vs Submodule 직접 read</h2>
+  <div class="cols-2">
+    <div class="card">
+      <h4 style="color:#f85149">RAG/MCP 방식</h4>
+      <pre><code>[질의]
+   ↓
+[Vector search]  top-k 청크 (수십)
+   ↓
+[LLM context]   무관·중복 청크 + 진짜 정보 일부
+   ↓
+[출력]   환각 위험 · 인접 IP와 혼동</code></pre>
+    </div>
+    <div class="card">
+      <h4 style="color:#3fb950">Submodule 직접 read (FW Repo)</h4>
+      <pre><code>[질의]
+   ↓
+[Read]   doc/nvme_ctrl/PROGRAMMERS_GUIDE.md  # submodule
+         doc/include/nvme_ctrl_hal.h         # submodule
+         fw/hal/nvme_ctrl_hal.c              # 현재 구현
+   ↓
+[LLM context]   정확히 3개 파일 (모두 working copy)
+   ↓
+[출력]   HAL.c 패치 + Python scenario stub
+         → CI가 F1·F2 + host smoke로 검증</code></pre>
+    </div>
+  </div>
+  <table style="margin-top:16px">
+    <thead><tr><th>측면</th><th>RAG/MCP</th><th>본 제안</th></tr></thead>
+    <tbody>
+      <tr><td>같은 질의 → 같은 컨텍스트?</td><td class="bad">인덱스 상태 의존</td><td class="good">git SHA 핀이면 항상 동일</td></tr>
+      <tr><td>출처 추적</td><td>인덱싱 메타데이터</td><td class="good">file_path:line 직접</td></tr>
+      <tr><td>검색 인프라 비용</td><td class="bad">벡터DB 운영</td><td class="good">0</td></tr>
+      <tr><td>Privacy</td><td>외부 인프라 가능</td><td class="good">git 안에서 끝</td></tr>
+    </tbody>
+  </table>
+  <div class="foot">SLIDE 13 — 컨텍스트 주입 비교</div>
+  <div class="notes">
+    이게 사용자가 가장 강조하고 싶어한 부분. RAG/MCP의 토큰·latency 비효율을 시각적으로.
+    "같은 질의 → 같은 컨텍스트?"가 핵심: 재현 가능성.
+  </div>
+</section>
+
+<!-- ─────────────────── 14. End-to-End 워크플로우 (3-repo) ─────────────────── -->
+<section class="slide">
+  <div class="kicker">End-to-End 워크플로우</div>
+  <h2>3개 저장소 × 부서별 swim lane</h2>
+  <div class="mermaid">
+flowchart LR
+    subgraph RTLR["① RTL Repo"]
+      H1["HW: RTL 변경<br/>(*.sv)"]
+      H2["lint + smoke synth<br/>tag (rtl-v*)"]
+    end
+    subgraph DOCR["② Doc Repo"]
+      H3["HW: DLD §5 갱신"]
+      A1["AI: IP-XACT + HAL.h"]
+      S1["SW: Guide §6 worked example"]
+      DC["Doc CI: D1–D5<br/>tag (doc-v*)"]
+    end
+    subgraph FWR["③ FW Repo"]
+      FS["submodule update<br/>(doc-v* pin)"]
+      A2["AI: HAL.c + Python scenario"]
+      F1["FW: ISR/DMA/락 보강"]
+      D1["DV: 측정·assertion 보강"]
+      FC["FW CI: F1–F5<br/>tag (fw-v*)"]
+    end
+    subgraph HW_PLATFORM["검증 플랫폼 (HW/SW coverif)"]
+      FPGA[FPGA]
+      EMU["Veloce / Zebu"]
+    end
+    H1 --> H2 --> H3 --> A1 --> S1 --> DC
+    DC -. submodule pin .-> FS
+    FS --> A2 --> F1 --> D1 --> FC
+    H2 -. bitstream / image .-> FPGA
+    H2 -. bitstream / image .-> EMU
+    FC -. FW binary load .-> FPGA
+    FC -. FW binary load .-> EMU
+    D1 -. Python이 FW 구동 .-> FPGA
+    D1 -. Python이 FW 구동 .-> EMU
+    FPGA -. coverage gap .-> H1
+    EMU  -. coverage gap .-> H1
+  </div>
+  <p class="lead">검증의 마지막 페이지는 <strong>FPGA + Veloce / Zebu</strong> 위에서 <strong>펌웨어가 실제 시나리오를 수행</strong>한다.</p>
+  <div class="foot">SLIDE 14 — 3-repo E2E</div>
+  <div class="notes">
+    3개 저장소가 swim lane으로. Doc Repo가 가운데에서 SW-HW 계약을 만들고, FW Repo가 submodule pin으로 핀하여 소비.
+    검증 플랫폼은 FPGA + Veloce/Zebu. Python scenarios가 펌웨어를 구동.
+    "rtl-v* × doc-v* × fw-v*" 세 tag로 어느 조합인지 항상 한 줄로 확정.
+  </div>
+</section>
+
+<!-- ─────────────────── 15. LLM Wiki / DeepWiki 비교 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">최신 트렌드와의 비교</div>
+  <h2>DeepWiki / LLM Wiki의 종착점에 우리가 서 있다</h2>
+  <table>
+    <thead>
+      <tr><th>측면</th><th>DeepWiki</th><th>본 제안</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Source of truth</td><td>코드</td><td><strong>코드 + 사람이 쓴 마크다운</strong></td></tr>
+      <tr><td>문서 위치</td><td>별도 호스팅 (deepwiki.com)</td><td><strong>git 안 (마크다운)</strong></td></tr>
+      <tr><td>문서 정합성</td><td>AI 추론 (재인덱싱 의존)</td><td class="good">CI invariant로 강제</td></tr>
+      <tr><td>AI 환각 처리</td><td>사용자 cross-check 권고</td><td class="good">PR 차단</td></tr>
+      <tr><td>외부 의존</td><td>DeepWiki 서비스</td><td class="good">0 (git만)</td></tr>
+      <tr><td>락인</td><td>Cognition 인프라</td><td class="good">없음</td></tr>
+    </tbody>
+  </table>
+  <blockquote style="margin-top:16px">
+    "Treat DeepWiki as a fast first read, <strong>not ground truth</strong>."
+    <span class="source">— DeepWiki 공식 가이드 (AI 생성 wiki의 한계 자인)</span>
+  </blockquote>
+  <p class="lead">DeepWiki가 비공식적으로 추구하는 방향을, 우리는 <strong>공식적·검증 가능</strong>하게 달성.</p>
+  <div class="foot">SLIDE 15 — DeepWiki와의 비교</div>
+  <div class="notes">
+    DeepWiki는 인덱싱 50K repo, 4B LoC. 그러나 자체 가이드가 "ground truth 아님"이라고 인정.
+    우리는 그 한계를 사람의 문서 + CI invariant로 메움.
+  </div>
+</section>
+
+<!-- ─────────────────── 16. Anthropic 증언 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">결정적 외부 증거</div>
+  <h2 style="margin-top:8vh">Anthropic Claude Code는<br/>이미 RAG를 폐기했다.</h2>
+  <blockquote style="font-size:28px; margin-top:24px">
+    "Boris Cherny's team built RAG into early Claude Code.<br/>
+    They tested it against agentic search.<br/>
+    <strong>Agentic search won — not narrowly.</strong><br/>
+    The main reasons: <strong>precision, simplicity, freshness, privacy</strong>."
+    <span class="source">— Why Claude Code Chose ripgrep Over Vector Search (rust-trends.com)</span>
+  </blockquote>
+  <p class="lead" style="margin-top:24px">
+    이 결정은 코드 도메인에서 내려졌다. <strong>SoC 산출물 도메인에서는 이 논거가 더 강하게 적용</strong>된다 —
+    SFR 이름·offset·width는 코드의 함수명보다도 정확한 심볼이다.
+  </p>
+  <div class="foot">SLIDE 16 — Anthropic 결정</div>
+  <div class="notes">
+    이 슬라이드가 가장 강력. "Anthropic도 우리와 같은 결정을 내렸다"는 점.
+    Boris Cherny는 Claude Code 창설자.
+    "agentic search won — not narrowly"가 핵심 카피.
+  </div>
+</section>
+
+<!-- ─────────────────── 17. 토큰 효율 차트 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">정량 효과 · 1 / 2</div>
+  <h2>토큰 효율 — RAG 방식의 절반 이하</h2>
+  <div class="chart-wrap" style="height:380px"><canvas id="chart-tokens"></canvas></div>
+  <div class="cols-3" style="margin-top:16px">
+    <div class="card">
+      <div class="num">2.6×</div>
+      <div class="label">RAG 방식 토큰 사용 / 본 제안</div>
+    </div>
+    <div class="card">
+      <div class="num">~50%</div>
+      <div class="label">연간 LLM API 비용 절감 (PR 1000건 가정)</div>
+    </div>
+    <div class="card">
+      <div class="num">0</div>
+      <div class="label">벡터DB · 임베딩 인프라 비용</div>
+    </div>
+  </div>
+  <div class="foot">SLIDE 17 — 토큰 효율</div>
+  <div class="notes">
+    irq_ctrl HAL enable 함수 추가를 예시로. 청크 다수 vs 3개 파일 직접 read.
+    숫자는 산업 평균이며 PoC에서 사내 실측으로 갱신할 것.
+  </div>
+</section>
+
+<!-- ─────────────────── 18. ROI 차트 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">정량 효과 · 2 / 2</div>
+  <h2>12개월 ROI 요약 (산업 평균 추정)</h2>
+  <div class="chart-wrap" style="height:380px"><canvas id="chart-roi"></canvas></div>
+  <p class="lead">근거: McKinsey 2025 AI 코딩 생산성 20–45% (well-defined task), DeepWiki 인덱싱 한계, RAGFlow 회고.</p>
+  <p style="margin-top:8px; color: var(--muted); font-size:17px">
+    ※ 본 수치는 산업 평균 기준 추정. PoC 단계에서 사내 실측 데이터로 갱신.
+  </p>
+  <div class="foot">SLIDE 18 — ROI</div>
+  <div class="notes">
+    6개 축 모두 누적 효과로 추정. EDA 락인 회피(100%)와 검색 인프라(100%)는 구조적으로 0이라 확실.
+    문서 drift 결함(-90%)은 invariant 6종이 잡지 못하는 사람 영역을 제외한 추정.
+  </div>
+</section>
+
+<!-- ─────────────────── 19. 로드맵 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">로드맵</div>
+  <h2>12개월 — 3개 lane 점진적 마이그레이션</h2>
+  <div class="mermaid">
+gantt
+    dateFormat YYYY-MM
+    axisFormat %m/%y
+    title  M0–M5 마일스톤 (12개월)
+    section M1 Lane A
+    Reference IP 표준화       :done, m1a, 2026-06, 1M
+    CI 6 invariant PR-required :crit, m1b, 2026-06, 1M
+    section M2 AI 도구
+    Guide → HAL 1-shot          :m2a, 2026-07, 2M
+    프롬프트 표준화              :m2b, 2026-09, 1M
+    section M3 Lane B
+    Top-5 IP 변환                :crit, m3a, 2026-08, 3M
+    Next-10 IP                  :m3b, 2026-11, 4M
+    잔여 활성 IP                 :m3c, 2027-02, 3M
+    section M5 신규 SoC
+    파생 SoC PoC                 :crit, m5a, 2026-10, 2M
+  </div>
+  <p class="lead">
+    Lane A (신규 IP) — Day 1부터.<br/>
+    Lane B (활성 in-house) — 우선순위 단위로 점진.<br/>
+    Lane C (legacy) — read-only 유지.
+  </p>
+  <div class="foot">SLIDE 19 — 로드맵</div>
+  <div class="notes">
+    All-or-nothing 결정이 아님. Lane A만으로도 가치. Lane B는 IP 단위 trade-off 가능.
+    임원에게 "리스크가 분산되어 있다"는 메시지.
+  </div>
+</section>
+
+<!-- ─────────────────── 20. CTA — 3가지 결정 ─────────────────── -->
+<section class="slide">
+  <div class="kicker">결정 요청</div>
+  <h2>임원·리더에게 요청하는 3가지 결정</h2>
+  <div class="cols-3" style="margin-top:18px">
+    <div class="card">
+      <div class="label">결정 1</div>
+      <h4 style="margin-top:6px">신규 IP/SoC의 표준 채택</h4>
+      <p>Lane A 즉시 효과. 기존 산출물 영향 없음.</p>
+      <p style="color:var(--good); font-weight:600">즉시</p>
+    </div>
+    <div class="card">
+      <div class="label">결정 2</div>
+      <h4 style="margin-top:6px">활성 IP 단계적 마이그레이션</h4>
+      <p>12개월 내 100% 흡수. ROI는 8장 추정치.</p>
+      <p style="color:var(--warn); font-weight:600">6–12개월</p>
+    </div>
+    <div class="card">
+      <div class="label">결정 3</div>
+      <h4 style="margin-top:6px">PoC KPI 대시보드 구축</h4>
+      <p>산업 평균을 사내 실측으로 대체. 6개월 회고.</p>
+      <p style="color:var(--accent); font-weight:600">2–3개월</p>
+    </div>
+  </div>
+  <blockquote style="margin-top:26px">
+    "문서가 코드 옆에 살고, AI가 그 문서를 직접 읽고, CI가 그 정합성을 검사한다."
+    <span class="source">— 다음 보고는 6개월 후, KPI 실측 회고로.</span>
+  </blockquote>
+  <p style="margin-top:18px; color:var(--muted); font-size:16px">
+    보고서 전문: <code>docs/proposal/</code> · 라이브 대시보드: <code>web/</code> · 문의: SoC Cfg-Mngt TF
+  </p>
+  <div class="foot">SLIDE 20 — 결정 요청</div>
+  <div class="notes">
+    마지막 슬라이드. 3개 결정을 명료한 카드로. 각각의 timing과 리스크를 한 줄.
+    마무리 인용은 보고서 결론과 동일.
+  </div>
+</section>
+
+</div><!-- /#deck -->
+
+<div id="chrome">
+  <span id="counter" class="badge">1 / 20</span>
+  <span class="badge"><span class="key">←</span> <span class="key">→</span> nav</span>
+  <span class="badge"><span class="key">N</span> notes</span>
+  <span class="badge"><span class="key">F</span> full</span>
+  <span class="badge"><span class="key">P</span> print</span>
+  <span class="badge"><span class="key">G</span> goto</span>
+</div>
+
+<script src="present.js"></script>
+</body>
+</html>
