@@ -26,8 +26,8 @@
 | [07](07-llmwiki-benchmark.md) | LLM Wiki / DeepWiki 벤치마크 | 6개 산업 트렌드와의 비교 |
 | [08](08-quantitative-impact.md) | 정량 효과 | 산업 평균 기준 ROI 추정 |
 | [09](09-risks-migration.md) | 리스크와 마이그레이션 | 3-lane 점진적 이행 |
-| [10](10-roadmap.md) | 로드맵 | 3·6·12개월 마일스톤 |
-| [11](11-conclusion.md) | 결론 | 임원/리더에게 요청하는 3가지 결정 |
+| [10](10-roadmap.md) | 로드맵 | 3개월(12주) 일제 전환 step-by-step |
+| [11](11-conclusion.md) | 결론 | 3개월 후 도달하는 모습 · 기회비용 |
 
 ## 부속 자료
 
@@ -45,8 +45,9 @@
 ### 임원 / 사업부장 (15분)
 1. [00 Executive Summary](00-executive-summary.md)
 2. [02 제안 §2.4 Before/After](02-proposal.md#24-무엇이-달라지는가--before--after-한눈에)
-3. [08 정량 효과 §8.8 ROI 요약](08-quantitative-impact.md#88-roi-요약-12개월-시점)
-4. [11 결론 §11.1 3가지 결정](11-conclusion.md#111-임원리더에게-요청하는-3가지-결정)
+3. [08 정량 효과 §8.8 ROI 요약](08-quantitative-impact.md#88-roi-요약-day-90-시점)
+4. [10 로드맵 — 3개월 일제 전환](10-roadmap.md)
+5. [11 결론 §11.1 3개월 후 모습](11-conclusion.md#111-3개월-후-도달하는-모습)
 
 ### SoC 실무자 / RTL designer (45분)
 1. [01 문제 정의](01-problem.md)

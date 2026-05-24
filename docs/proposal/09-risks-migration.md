@@ -22,27 +22,30 @@
 
 ---
 
-## 9.2 마이그레이션 전략 — Risk-tiered 3-Lane
+## 9.2 마이그레이션 스코프 — 전 IP 동시, 부분 채택 없음
 
-기존 환경의 인공물을 한 번에 옮기지 않고, 다음 3 lane으로 점진적
-이행한다. (Phase 0의 포맷 변환은 9.3에서 별도 다룸 — 모든 lane의 prerequisite)
+본 제안은 lane 분할이나 단계적 흡수를 하지 않는다. **모든 IP가 한 번에
+신 워크플로우로 전환**되며, 컷오버 시점 이후 예전 포맷은 read-only로만
+존재한다. 그 이유:
 
-### Lane A — 신규 IP/SoC (Day 1부터 본 제안)
-- 모든 신규 IP는 본 워크플로우의 4-repo 산출물 구조를 따른다.
-- Reference IP (`irq_ctrl`, `trng`) 템플릿에서 시작.
-- Doc D1–D5 + FW F1–F3 + Test T1–T4 + Release R1 invariant를 PR Required Status Check로 강제.
-- **이 lane은 비용이 가장 낮고 효과가 가장 빠르다**.
+- **양립 운영의 비용**. Lane을 나누면 "이 IP는 Confluence + 저것은 Markdown",
+  "이 IP는 SV TB + 저것은 Python coverif" 같은 이중 운영이 6–12개월간
+  계속된다. AI 컨텍스트 일관성·CI invariant·release 매니페스트가 모두 부분
+  지원을 처리해야 해 복잡도가 폭증한다.
+- **결정의 지연 비용**. "다음 IP는 언제 옮길지" 결정이 매 분기 반복되며,
+  IP owner의 자원 배분이 흔들린다. 일제 전환은 이 결정을 한 번에 끝낸다.
+- **AI 컨텍스트의 결정론**. submodule 모델은 모든 IP가 같은 패턴을 따를 때
+  가장 강하다. 일부만 적용하면 LLM이 "이 IP는 어디 봐야 하나" 추론을
+  계속해야 한다.
 
-### Lane B — 활발히 수정되는 in-house IP (점진적)
-- IP 단위로 우선순위를 정해 마이그레이션.
-- 우선순위는 ① RTL 수정 빈도 ② SoC 파생 사용 빈도 ③ FW 팀 의존도.
-- 1 IP당 평균 1–2주 (Word→MD + Excel→SystemRDL 변환 + 가이드 작성 + invariant 통과).
+스코프 결정:
 
-### Lane C — 안정화된 legacy IP (read-only 유지)
-- 더 이상 수정되지 않는 legacy IP는 Confluence/SharePoint에 그대로
-  read-only 보관.
-- Doc Repo에는 "legacy 참조 링크"만 둠.
-- 새 SoC가 이 IP를 사용하려면 lane B로 승급 (그 시점에만 변환 비용).
+| 항목 | 정책 |
+|---|---|
+| **신규 IP** | 컷오버 후 신 워크플로우로만 작성 |
+| **활성 in-house IP** | 12주 안에 **전부** 변환 (§10 참조) |
+| **Legacy/freeze IP** | 변환은 하되, 컷오버 후 추가 수정 없음 (사실상 read-only) |
+| **외주/IP vendor** | 흡수 시점에 변환 — 표준 절차로 흡수 (`docx2md` + `xlsx2rdl`) |
 
 ## 9.3 Phase 0 — 현재 포맷 마이그레이션 (Word/Excel → MD/SystemRDL)
 
@@ -70,30 +73,6 @@
 
 ---
 
-## 9.3 12개월 마이그레이션 로드맵 (요약)
-
-```mermaid
-gantt
-    dateFormat YYYY-MM
-    title  마이그레이션 (12개월)
-    section Lane A (신규)
-    신규 IP 본 제안 적용         :a1, 2026-06, 12M
-    section Lane B (활성 in-house)
-    Top-5 IP 변환               :b1, 2026-06, 3M
-    Next-10 IP 변환             :b2, 2026-09, 4M
-    잔여 활성 IP 변환            :b3, 2026-12, 4M
-    section Lane C (legacy)
-    인벤토리 + read-only 표시   :c1, 2026-06, 2M
-    section Infrastructure
-    CI invariant 풀세트         :i1, 2026-06, 1M
-    AI 생성 도구 사내 배포       :i2, 2026-07, 3M
-    PoC 측정 KPI 대시보드       :i3, 2026-08, 2M
-```
-
-세부 마일스톤은 §10에서 다룬다.
-
----
-
 ## 9.4 조직 변화 관리 — 익숙함과 어떻게 화해하는가
 
 | 우려 (현장 목소리) | 대응 |
@@ -106,22 +85,20 @@ gantt
 
 ---
 
-## 9.5 실패 시나리오와 fallback
+## 9.5 12주 안 실패 시나리오와 대응
 
-> **만약 채택 후 6개월 시점에 KPI가 기대 미달이면?**
+일제 전환이라 "부분 후퇴" 옵션이 없다. 대신 12주 안에 발생할 수 있는
+3가지 실패 모드를 사전에 식별하고 mitigation을 준비한다.
 
-가능한 원인과 대응:
+| 시점 | 실패 모드 | 진단 | 대응 |
+|---|---|---|---|
+| Week 2 종료 | 변환 도구 신뢰성 부족 | `docx2md` 결과의 다이어그램 누락 多, `xlsx2rdl` 매핑 미적용 케이스 | DevOps 인력 +1 spike, 사내 Excel template 강제 표준화. Week 3까지 회복 |
+| Week 6 종료 | Programmer's Guide 초안 작성이 지연 | AI 초안이 SW lead 리뷰 큐에서 정체 | 리뷰 기준을 "intent만 본다"로 명시. CI invariant가 사실 정합성을 잡으므로 사람 리뷰는 의도 확인에만 집중 |
+| Week 9 종료 | invariant blocking 전환 시 false-positive 폭증 | Step 4–7 동안 warning 튜닝이 부족 | Week 9-10 동안 invariant 우선순위를 정해 strict한 것부터 blocking, 나머지는 warning 유지. 그래도 12주 컷오버 데드라인은 유지 |
 
-| 원인 | 진단 | 대응 |
-|---|---|---|
-| Submodule 운영 부담이 예상보다 큼 | `make` 추상화 도달 못함 | Harness CLI 보강, 사내 onboarding 강의 1회 |
-| AI 자동 생성 품질 저조 | 프롬프트·컨텍스트 패키지 미정형화 | 프롬프트 템플릿 표준화, IP-별 sample 축적 |
-| Invariant false-positive 다수 | 검사 로직 강도 조정 필요 | 6종 중 가장 strict한 #2를 단계적 강화 |
-| 조직 저항 | 가시적 성공 사례 부족 | Lane A의 신규 IP 1건을 사내 사례로 공개 발표 |
-
-본 제안은 **부분 채택 가능**하다. Lane A만 적용해도 가치가 있고, lane B
-는 IP 단위로 trade-off를 다시 판단할 수 있다. **all-or-nothing 결정이
-아니다**.
+> **데드라인은 협상 대상이 아니지만, 정합성 강도는 단계적으로 조절 가능**.
+> 가장 strict한 invariant (D1 RTL ↔ DLD, R1 FW.doc-SHA == Test.doc-SHA)부터
+> blocking, 나머지는 컷오버 후 1–2주 안에 강화한다.
 
 ---
 
@@ -139,5 +116,5 @@ gantt
 
 ## 9.7 다음 장 예고
 
-§10에서 본 마이그레이션을 **3·6·12개월 마일스톤**으로 분해하고, §11에서
-임원/리더가 다음으로 취해야 할 액션을 정리한다.
+§10에서 12주 step-by-step 전환 계획을 단계별로 분해하고, §11에서 3개월 후
+도달하는 모습과 기회비용을 정리한다.

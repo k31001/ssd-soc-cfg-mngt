@@ -45,12 +45,19 @@
 
 ---
 
-## 다음 액션 (요약)
+## 다음 액션 — 3개월 일제 전환
 
-0. **Phase 0 (0–2개월 · 마이그레이션 prerequisite)**: 현재 Word 문서 (HLD/DLD)와 Excel SFR 표를 **마크다운 + SystemRDL `.rdl`** 로 일괄 변환. Pandoc + 자동 변환 스크립트로 사람이 만지는 페이지 최소화.
-1. **Phase 1 (2–5개월)**: 4-repo (RTL · Doc · FW · Test) 토폴로지 셋업. Doc Repo의 D1–D5 invariant, FW Repo의 F1–F3, Test Repo의 T1–T4 CI 가동. 참조 IP 1–2종을 신규 IP의 카피러프트 템플릿으로 표준화.
-2. **Phase 2 (5–8개월)**: AI 어시스턴트가 Programmer's Guide → HAL.c (FW Repo), Programmer's Guide → Python scenarios (Test Repo)를 1-shot으로 생성하도록 컨텍스트 패키지를 정형화. Release gate R1 (`FW.doc-SHA == Test.doc-SHA`) 자동화.
-3. **Phase 3 (8–12개월)**: 기존 in-house IP를 점진적으로 본 구조로 마이그레이션. EDA 벤더 AI 솔루션 락인을 회피하면서 동등 효과 확보.
+전 IP를 동시에 신 워크플로우로 옮기는 **war-room 체제**. 부분 채택 없음.
+세부 step-by-step은 §10 참조.
+
+| 기간 | 단계 | 핵심 산출물 |
+|---|---|---|
+| **Week 1–2** | 4-repo 인프라 + 변환 도구 (`docx2md`, `xlsx2rdl`, `peakrdl`) 셋업 | 4개 저장소 · 변환 파이프라인 · CI invariant warning 가동 |
+| **Week 2–5** | 전 IP **Bulk 변환** + Doc 수동 보정 (병렬) | 모든 HLD/DLD가 Markdown, 모든 SFR이 SystemRDL |
+| **Week 4–7** | Programmer's Guide §6 worked example 작성 (전 IP 병렬, AI 보조) | 모든 IP의 SW-HW 계약 문서 |
+| **Week 5–9** | FW Repo · Test Repo 이관 + HAL.c · Python scenario AI 재생성 | 4-repo가 모두 PR-able 상태 |
+| **Week 9–10** | CI 게이트 **warning → blocking** 전환, Release gate R1 활성화 | 모든 IP가 D + F + T + R 통과 |
+| **Week 10–12** | 첫 4-tuple release + 컷오버 (Word/Excel/Confluence read-only) | `rtl-v* × doc-v* × fw-v* × test-v*` · KPI baseline |
 
 세부 내용은 다음 11개 챕터에서 단계별로 정당화한다.
 

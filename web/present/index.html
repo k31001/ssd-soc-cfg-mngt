@@ -577,7 +577,7 @@ flowchart LR
 <!-- ─────────────────── 18. ROI 차트 ─────────────────── -->
 <section class="slide">
   <div class="kicker">정량 효과 · 2 / 2</div>
-  <h2>12개월 ROI 요약 (산업 평균 추정)</h2>
+  <h2>Day 90 ROI 요약 (산업 평균 추정)</h2>
   <div class="chart-wrap" style="height:380px"><canvas id="chart-roi"></canvas></div>
   <p class="lead">근거: McKinsey 2025 AI 코딩 생산성 20–45% (well-defined task), DeepWiki 인덱싱 한계, RAGFlow 회고.</p>
   <p style="margin-top:8px; color: var(--muted); font-size:17px">
@@ -593,75 +593,82 @@ flowchart LR
 <!-- ─────────────────── 19. 로드맵 ─────────────────── -->
 <section class="slide">
   <div class="kicker">로드맵</div>
-  <h2>12개월 — M0 포맷 마이그레이션 + 4-repo 점진 적용</h2>
+  <h2>3개월 (12주) 일제 전환 — 전 IP 동시</h2>
   <div class="mermaid">
 gantt
-    dateFormat YYYY-MM
-    axisFormat %m/%y
-    title  M0–M5 마일스톤 (12개월)
-    section M0 포맷 마이그레이션 (prereq)
-    Word→Markdown 파이프라인        :crit, m0a, 2026-06, 1M
-    Excel→SystemRDL 변환 스크립트   :crit, m0b, 2026-06, 2M
-    Ref IP 2종 변환                 :m0c, 2026-07, 1M
-    section M1 4-repo 인프라
-    RTL/Doc/FW/Test 셋업            :m1a, 2026-07, 1M
-    D/F/T CI + Release gate         :crit, m1b, 2026-08, 2M
-    section M2 AI 도구
-    Guide → HAL.c (FW)              :m2a, 2026-08, 2M
-    Guide → Python (Test)           :m2b, 2026-09, 2M
-    section M3 Lane B (활성 IP)
-    Top-5 IP 변환                   :crit, m3a, 2026-09, 3M
-    Next-10 IP                      :m3b, 2026-12, 4M
-    잔여 활성 IP                    :m3c, 2027-03, 3M
-    section M5 신규 SoC
-    파생 SoC PoC                    :crit, m5a, 2026-11, 2M
+    dateFormat YYYY-WW
+    axisFormat W%W
+    title  12주 step-by-step (war-room 체제)
+    section 인프라 · 도구
+    Step 1 4-repo 셋업                       :crit, s1, 2026-W23, 1w
+    Step 2 변환 도구 (docx2md · xlsx2rdl)    :crit, s2, 2026-W23, 2w
+    section Bulk 변환
+    Step 3 전 IP 일괄 변환                    :crit, s3, 2026-W24, 2w
+    Step 4 Doc 수동 보정 (전 IP 병렬)         :crit, s4, 2026-W25, 3w
+    Step 5 Programmer's Guide 작성            :crit, s5, 2026-W26, 4w
+    section FW · Test 이관
+    Step 6 FW Repo + HAL.c 재생성             :s6, 2026-W27, 4w
+    Step 7 Test Repo + Python scenarios       :s7, 2026-W27, 5w
+    section 강제 · 컷오버
+    Step 8 CI warning → blocking              :crit, s8, 2026-W31, 2w
+    Step 9 통합 검증 + 첫 4-tuple release     :crit, s9, 2026-W32, 2w
+    Step 10 컷오버 + 안정화                    :crit, s10, 2026-W33, 2w
   </div>
   <p class="lead">
-    <strong>M0 prerequisite</strong>: Word HLD/DLD → Markdown · Excel SFR → SystemRDL.<br/>
-    Lane A (신규) Day 1부터 · Lane B (활성) 단계적 · Lane C (legacy) read-only.
+    부분 채택 없음 · 전 IP 동시 적용 · <strong>12주 안에 컷오버</strong>.<br/>
+    Critical path: Step 2 (변환 도구) → Step 5 (Guide 작성) → Step 8 (CI blocking).
+  </p>
+  <p style="font-size:14px; color:var(--muted); margin-top:8px">
+    Day 0: 모든 산출물이 Word/Excel/Confluence · Day 90: 4-repo + Markdown + SystemRDL + CI invariant 강제
   </p>
   <div class="foot">SLIDE 19 — 로드맵</div>
   <div class="notes">
-    All-or-nothing 결정이 아님. Lane A만으로도 가치. Lane B는 IP 단위 trade-off 가능.
-    임원에게 "리스크가 분산되어 있다"는 메시지.
+    부분 채택 없음 — 전 IP 동시. 12주 안에 컷오버.
+    Critical path: 변환 도구(Step 2) → Programmer's Guide(Step 5) → CI blocking(Step 8).
   </div>
 </section>
 
-<!-- ─────────────────── 20. CTA — 3가지 결정 ─────────────────── -->
+<!-- ─────────────────── 20. 3개월 후 도달하는 모습 ─────────────────── -->
 <section class="slide">
-  <div class="kicker">결정 요청</div>
-  <h2>임원·리더에게 요청하는 3가지 결정</h2>
-  <div class="cols-3" style="margin-top:18px">
+  <div class="kicker">결론</div>
+  <h2>3개월 후, 우리가 도달해 있는 모습</h2>
+  <div class="cols-2" style="margin-top:14px">
     <div class="card">
-      <div class="label">결정 1</div>
-      <h4 style="margin-top:6px">신규 IP/SoC의 표준 채택</h4>
-      <p>Lane A 즉시 효과. 기존 산출물 영향 없음.</p>
-      <p style="color:var(--good); font-weight:600">즉시</p>
+      <h4>📦 산출물 · 저장소</h4>
+      <ul style="font-size:18px">
+        <li>RTL · Doc · FW · Test <strong>4-repo</strong> 운영 중</li>
+        <li>모든 문서가 <strong>Markdown</strong>, 모든 SFR이 <strong>SystemRDL</strong></li>
+        <li>Word/Excel/Confluence 0건 (read-only archive)</li>
+        <li>SW-HW 계약은 Doc Repo의 단일 출처</li>
+      </ul>
     </div>
     <div class="card">
-      <div class="label">결정 2</div>
-      <h4 style="margin-top:6px">활성 IP 단계적 마이그레이션</h4>
-      <p>12개월 내 100% 흡수. ROI는 8장 추정치.</p>
-      <p style="color:var(--warn); font-weight:600">6–12개월</p>
-    </div>
-    <div class="card">
-      <div class="label">결정 3</div>
-      <h4 style="margin-top:6px">PoC KPI 대시보드 구축</h4>
-      <p>산업 평균을 사내 실측으로 대체. 6개월 회고.</p>
-      <p style="color:var(--accent); font-weight:600">2–3개월</p>
+      <h4>🛡 정합성 · AI</h4>
+      <ul style="font-size:18px">
+        <li><strong>D1–D5 · F1–F3 · T1–T4 · R1</strong> 모두 PR-blocking</li>
+        <li>AI가 HAL.c · Python scenario 자동 생성, CI가 검증</li>
+        <li>RAG/MCP 없음 — submodule 직접 read</li>
+        <li>release는 <code>rtl-v* × doc-v* × fw-v* × test-v*</code> 4-tuple로 식별</li>
+      </ul>
     </div>
   </div>
-  <blockquote style="margin-top:26px">
-    "문서가 코드 옆에 살고, AI가 그 문서를 직접 읽고, CI가 그 정합성을 검사한다."
-    <span class="source">— 다음 보고는 6개월 후, KPI 실측 회고로.</span>
+  <div class="card" style="margin-top:14px; background:rgba(63,185,80,0.08); border-color:#3fb950">
+    <h4 style="color:#3fb950">🚀 그 다음부터</h4>
+    <p style="margin:6px 0; font-size:18px">
+      신규 SoC 파생은 <strong>FW Repo · Test Repo만 fork → submodule pin → 즉시 시작</strong>. 별도 마이그레이션 없음.
+      외주 IP 흡수는 표준 포맷 변환 한 번으로 끝남.
+    </p>
+  </div>
+  <blockquote style="margin-top:18px; font-size:21px">
+    "문서가 코드 옆에 살고, AI가 그 문서를 직접 읽고, CI가 그 정합성을 검사한다.<br/>
+    펌웨어는 FPGA·Veloce·Zebu에서 동작하고, SSD Host의 Python이 그것을 실제 NVMe 명령으로 구동한다."
+    <span class="source">— 12주 후의 사내 실측 회고에서 다시 만남.</span>
   </blockquote>
-  <p style="margin-top:18px; color:var(--muted); font-size:16px">
-    보고서 전문: <code>docs/proposal/</code> · 라이브 대시보드: <code>web/</code> · 문의: SoC Cfg-Mngt TF
-  </p>
-  <div class="foot">SLIDE 20 — 결정 요청</div>
+  <div class="foot">SLIDE 20 — 3개월 후의 모습</div>
   <div class="notes">
-    마지막 슬라이드. 3개 결정을 명료한 카드로. 각각의 timing과 리스크를 한 줄.
-    마무리 인용은 보고서 결론과 동일.
+    마지막 슬라이드. 결정을 요청하지 않는다. 대신 "3개월 후 도달할 상태"를 객관적으로 묘사.
+    왼쪽 카드는 산출물 측면, 오른쪽은 정합성·AI 측면. 아래는 그 다음 단계 — 신규 SoC 파생이 얼마나 쉬워지는지.
+    마무리 인용은 본 보고서 §11.3과 동일.
   </div>
 </section>
 
