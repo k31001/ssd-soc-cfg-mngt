@@ -2,6 +2,25 @@
 // 발표 모드 — 키보드 네비, 진행도 바, 발표자 노트, 프래그먼트 (점진적 reveal)
 
 (function () {
+  // ─── Mermaid: 초기화는 동기적으로, run() 은 slide 가 활성화된 뒤에만.
+  if (window.mermaid) {
+    window.mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      themeVariables: {
+        background: '#0d1117',
+        primaryColor: '#161b22',
+        primaryTextColor: '#e6edf3',
+        primaryBorderColor: '#30363d',
+        lineColor: '#58a6ff',
+        secondaryColor: '#21262d',
+        tertiaryColor: '#1f2428',
+        fontFamily: 'system-ui',
+        fontSize: '15px',
+      },
+    });
+  }
+
   const slides = Array.from(document.querySelectorAll('.slide'));
   const progress = document.getElementById('progress');
   const counter = document.getElementById('counter');
@@ -23,6 +42,19 @@
     });
   }
 
+  async function ensureMermaidRendered(slideIdx) {
+    if (!window.mermaid) return;
+    const slide = slides[slideIdx];
+    if (!slide) return;
+    const blocks = slide.querySelectorAll('.mermaid:not([data-processed="true"])');
+    if (blocks.length === 0) return;
+    try {
+      await window.mermaid.run({ nodes: Array.from(blocks) });
+    } catch (e) {
+      console.error('mermaid render failed for slide', slideIdx + 1, e);
+    }
+  }
+
   function show(i, opts = {}) {
     idx = clamp(i);
     slides.forEach((s, j) => s.classList.toggle('active', j === idx));
@@ -37,7 +69,12 @@
     if (window.location.hash !== '#' + (idx + 1)) {
       history.replaceState(null, '', '#' + (idx + 1));
     }
+    // Lazy render mermaid only after the slide is laid out (display:flex 적용 후)
+    requestAnimationFrame(() => ensureMermaidRendered(idx));
   }
+
+  // Expose for the print handler
+  window.__deck = { ensureMermaidRendered, slides };
 
   function next() {
     const frags = currentFragments();
@@ -94,7 +131,8 @@
         break;
       case 'p':
       case 'P':
-        window.print();
+        e.preventDefault();
+        prepareAndPrint();
         break;
       case 'g':
       case 'G': {
@@ -129,10 +167,21 @@
   }
   window.addEventListener('hashchange', fromHash);
 
-  // Print mode: show all slides
-  window.addEventListener('beforeprint', () => {
+  // Print mode: show all slides + render any pending mermaid 후 print 호출.
+  // (브라우저의 Cmd-P / Ctrl-P 도 같은 경로로 통합)
+  async function prepareAndPrint() {
     slides.forEach((s) => s.classList.add('active'));
-  });
+    if (window.mermaid) {
+      const all = document.querySelectorAll('.mermaid:not([data-processed="true"])');
+      if (all.length > 0) {
+        try { await window.mermaid.run({ nodes: Array.from(all) }); }
+        catch (e) { console.error('mermaid render (print) failed', e); }
+      }
+    }
+    // 레이아웃 정리 후 인쇄
+    setTimeout(() => window.print(), 80);
+  }
+
   window.addEventListener('afterprint', () => {
     slides.forEach((s, j) => s.classList.toggle('active', j === idx));
   });
@@ -145,27 +194,8 @@
   fromHash();
 })();
 
-// Mermaid init (deferred to allow slide load)
-window.addEventListener('load', () => {
-  if (window.mermaid) {
-    window.mermaid.initialize({
-      startOnLoad: false,
-      theme: 'dark',
-      themeVariables: {
-        background: '#0d1117',
-        primaryColor: '#161b22',
-        primaryTextColor: '#e6edf3',
-        primaryBorderColor: '#30363d',
-        lineColor: '#58a6ff',
-        secondaryColor: '#21262d',
-        tertiaryColor: '#1f2428',
-        fontFamily: 'system-ui',
-        fontSize: '15px',
-      },
-    });
-    window.mermaid.run();
-  }
-});
+// (Mermaid initialize 는 IIFE 진입 시점에 이미 실행됨 — 위 참고.
+//  Lazy render 는 slide show() 가 호출될 때마다 자동 발생.)
 
 // Chart.js init for the impact slide
 window.addEventListener('load', () => {
