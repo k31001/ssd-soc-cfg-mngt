@@ -337,20 +337,20 @@ flowchart LR
       <div class="mermaid">
 classDiagram
   class NvmeHal {
-    +reset() : int
-    +admin_enable() : int
-    +csts() : u32
-    +submit_admin(cmd) : int
+    +reset() int
+    +admin_enable() int
+    +csts() u32
+    +submit_admin(cmd) int
   }
   class IrqCtrlHal {
-    +enable(line: int) : int
-    +ack(line: int) : void
-    +status() : u32
+    +enable(line int) int
+    +ack(line int) void
+    +status() u32
   }
   class HalCommon {
-    <<interface>>
-    +read32(off) : u32
-    +write32(off, val) : void
+    &lt;&lt;interface&gt;&gt;
+    +read32(off) u32
+    +write32(off, val) void
   }
   NvmeHal --|> HalCommon
   IrqCtrlHal --|> HalCommon
@@ -685,23 +685,23 @@ flowchart LR
   <h2>3개월 (12주) 일제 전환 — 전 IP 동시</h2>
   <div class="mermaid">
 gantt
-    dateFormat YYYY-WW
-    axisFormat W%W
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
     title  12주 step-by-step (war-room 체제)
     section 인프라 · 도구
-    Step 1 4-repo 셋업                       :crit, s1, 2026-W23, 1w
-    Step 2 변환 도구 (docx2md · xlsx2rdl)    :crit, s2, 2026-W23, 2w
+    Step 1 4-repo 셋업                       :crit, s1, 2026-06-01, 7d
+    Step 2 변환 도구 (docx2md · xlsx2rdl)    :crit, s2, 2026-06-01, 14d
     section Bulk 변환
-    Step 3 전 IP 일괄 변환                    :crit, s3, 2026-W24, 2w
-    Step 4 Doc 수동 보정 (전 IP 병렬)         :crit, s4, 2026-W25, 3w
-    Step 5 Programmer's Guide 작성            :crit, s5, 2026-W26, 4w
+    Step 3 전 IP 일괄 변환                    :crit, s3, 2026-06-08, 14d
+    Step 4 Doc 수동 보정 (전 IP 병렬)         :crit, s4, 2026-06-15, 21d
+    Step 5 Programmer's Guide 작성            :crit, s5, 2026-06-22, 28d
     section FW · Test 이관
-    Step 6 FW Repo + HAL.c 재생성             :s6, 2026-W27, 4w
-    Step 7 Test Repo + Python scenarios       :s7, 2026-W27, 5w
+    Step 6 FW Repo + HAL.c 재생성             :s6, 2026-06-29, 28d
+    Step 7 Test Repo + Python scenarios       :s7, 2026-06-29, 35d
     section 강제 · 컷오버
-    Step 8 CI warning → blocking              :crit, s8, 2026-W31, 2w
-    Step 9 통합 검증 + 첫 4-tuple release     :crit, s9, 2026-W32, 2w
-    Step 10 컷오버 + 안정화                    :crit, s10, 2026-W33, 2w
+    Step 8 CI warning → blocking              :crit, s8, 2026-07-27, 14d
+    Step 9 통합 검증 + 첫 4-tuple release     :crit, s9, 2026-08-03, 14d
+    Step 10 컷오버 + 안정화                    :crit, s10, 2026-08-10, 14d
   </div>
   <p class="lead">
     부분 채택 없음 · 전 IP 동시 적용 · <strong>12주 안에 컷오버</strong>.<br/>

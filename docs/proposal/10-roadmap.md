@@ -116,30 +116,30 @@
 
 ```mermaid
 gantt
-    dateFormat YYYY-WW
-    axisFormat W%W
+    dateFormat YYYY-MM-DD
+    axisFormat %m/%d
     title  AI 친화 SoC 산출물 관리 — 12주 일제 전환
 
     section 인프라 · 도구
-    Step 1 4-repo 셋업                :crit, s1, 2026-W23, 1w
-    Step 2 변환 도구 개발              :crit, s2, 2026-W23, 2w
+    Step 1 4-repo 셋업                :crit, s1, 2026-06-01, 7d
+    Step 2 변환 도구 개발              :crit, s2, 2026-06-01, 14d
 
     section Bulk 변환
-    Step 3 전 IP 일괄 변환             :crit, s3, 2026-W24, 2w
-    Step 4 Doc 수동 보정 (전 IP 병렬)  :crit, s4, 2026-W25, 3w
-    Step 5 Programmer's Guide 작성     :crit, s5, 2026-W26, 4w
+    Step 3 전 IP 일괄 변환             :crit, s3, 2026-06-08, 14d
+    Step 4 Doc 수동 보정 (전 IP 병렬)  :crit, s4, 2026-06-15, 21d
+    Step 5 Programmer's Guide 작성     :crit, s5, 2026-06-22, 28d
 
     section FW · Test 이관
-    Step 6 FW Repo 이관 + HAL.c 재생성  :s6, 2026-W27, 4w
-    Step 7 Test Repo + Python scenario  :s7, 2026-W27, 5w
+    Step 6 FW Repo 이관 + HAL.c 재생성  :s6, 2026-06-29, 28d
+    Step 7 Test Repo + Python scenario  :s7, 2026-06-29, 35d
 
     section 강제 + 컷오버
-    Step 8 CI warning → blocking         :crit, s8, 2026-W31, 2w
-    Step 9 통합 검증 + 첫 4-tuple        :crit, s9, 2026-W32, 2w
-    Step 10 컷오버 + 안정화              :crit, s10, 2026-W33, 2w
+    Step 8 CI warning → blocking         :crit, s8, 2026-07-27, 14d
+    Step 9 통합 검증 + 첫 4-tuple        :crit, s9, 2026-08-03, 14d
+    Step 10 컷오버 + 안정화              :crit, s10, 2026-08-10, 14d
 
     section 검증 환경
-    FPGA/Veloce/Zebu nightly 가동       :env1, 2026-W32, 3w
+    FPGA/Veloce/Zebu nightly 가동       :env1, 2026-08-03, 21d
 ```
 
 (Week 번호는 예시. 실제 킥오프 시점에 절대 날짜로 환산.)

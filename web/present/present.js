@@ -56,17 +56,18 @@
   }
 
   // WaveDrom — slide 11 (시각화 종합) 의 timing diagram.
-  // 첫 활성화 시점에 ProcessAll() 한 번 호출. WaveDrom 은 SVG 를 explicit
-  // dimension 으로 만들어 부착하므로 display:none 의 영향을 받지 않는다.
+  // 첫 활성화 시점에 processAll() 한 번 호출.
+  // 주의: WaveDrom 3.x 는 global 이 소문자 (`window.wavedrom`) 이고 메서드도
+  //       camelCase (`processAll`) 이다. 2.x 의 `WaveDrom.ProcessAll()` 과 다름.
   let waveDromProcessed = false;
   function ensureWaveDromRendered(slideIdx) {
-    if (!window.WaveDrom || waveDromProcessed) return;
+    if (!window.wavedrom || waveDromProcessed) return;
     const slide = slides[slideIdx];
     if (!slide) return;
     const hasWaveDrom = slide.querySelector('script[type="WaveDrom"]');
     if (!hasWaveDrom) return;
     try {
-      window.WaveDrom.ProcessAll();
+      window.wavedrom.processAll();
       waveDromProcessed = true;
     } catch (e) {
       console.error('WaveDrom render failed', e);
@@ -199,9 +200,9 @@
         catch (e) { console.error('mermaid render (print) failed', e); }
       }
     }
-    // WaveDrom 도 인쇄 전 모두 처리
-    if (window.WaveDrom && !waveDromProcessed) {
-      try { window.WaveDrom.ProcessAll(); waveDromProcessed = true; }
+    // WaveDrom 도 인쇄 전 모두 처리 (3.x: lowercase global, camelCase method)
+    if (window.wavedrom && !waveDromProcessed) {
+      try { window.wavedrom.processAll(); waveDromProcessed = true; }
       catch (e) { console.error('WaveDrom render (print) failed', e); }
     }
     // 레이아웃 정리 후 인쇄
