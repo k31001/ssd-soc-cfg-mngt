@@ -11,9 +11,15 @@
   <header>
     <div class="container">
       <h1>SSD SoC — IP Closed-Loop Workflow</h1>
-      <p class="lead">RTL → 설계문서 → IP-XACT → Programmer's Guide → HAL → Test Scenarios → RTL Verification 의 폐쇄 루프를 정의하고, <code>tools/ipflow.py</code> 가 그 invariant 를 자동 검사한다.</p>
+      <p class="lead">
+        <strong>운영 모델</strong>: RTL · Doc · FW · Test <strong>4개 저장소</strong> + Doc→{FW,Test} 단방향 submodule.
+        FW 는 FPGA · Veloce · Zebu 에 load, Python coverif 는 SSD Host 에서 NVMe/PCIe 로 SoC 구동.
+        <strong>본 레포의 9-stage 흐름</strong> (아래 §1) 은 그 운영 모델의 <em>단일 저장소 개념 증명</em>이며,
+        <code>tools/ipflow.py</code> 가 invariant 를 자동 검사한다.
+      </p>
       <nav>
-        <a href="#workflow">Workflow</a>
+        <a href="#production" style="font-weight:600">Production (4-repo)</a>
+        <a href="#workflow">Concept (9-stage)</a>
         <a href="#stages">Stages</a>
         <a href="#status">Live Status</a>
         <a href="#trace">irq_ctrl Trace</a>
@@ -25,10 +31,83 @@
   </header>
 
   <main class="container">
-    <!-- ─────────── Section 1: Workflow overview ─────────── -->
+    <!-- ─────────── Section 0: Production Target Architecture (4-repo) ─────────── -->
+    <section id="production">
+      <h2>0. 운영 모델 — 4-repo 토폴로지 + SSD Host coverif</h2>
+      <p>
+        실제 SSD Controller 개발은 <strong>4개 독립 저장소</strong>로 분리되고, <strong>Doc Repo 가 FW · Test 양쪽의 단방향 submodule 출처</strong>가 된다.
+        펌웨어는 <strong>FPGA · Veloce · Zebu</strong> 에 binary 로 load 되어 실행되고,
+        Python coverif scenarios 는 <strong>SSD Host (Linux 서버)</strong> 에서 NVMe/PCIe 로 그 펌웨어를 구동·관찰한다 — 실제 SSD 동작 환경과 동일.
+      </p>
+
+      <div class="mermaid">
+flowchart LR
+    subgraph R1["① RTL Repo"]
+      r1a[rtl/**/*.sv]
+    end
+    subgraph R2["② Doc Repo (tag-released)"]
+      r2a["HLD / DLD / PG"]:::contract
+      r2b["&lt;ip&gt;.rdl (SystemRDL)<br/>또는 *.ipxact.xml"]
+      r2c["include/&lt;ip&gt;_hal.h<br/>(peakrdl auto-gen)"]
+    end
+    subgraph R3["③ FW Repo · FPGA·Emul에 load"]
+      r3a["fw/hal/*.c<br/>fw/drivers · fw/app"]
+      r3c["doc/ ← submodule"]:::contract
+    end
+    subgraph R4["④ Test Repo · SSD Host에서 실행"]
+      r4a["tests/scenarios/*.py<br/>(NVMe / PCIe coverif)"]
+      r4c["doc/ ← submodule"]:::contract
+    end
+    subgraph HW["검증 환경"]
+      HOST["SSD Host<br/>(PCIe · NVMe)"]
+      PLAT["FPGA · Veloce · Zebu<br/>(SoC + FW)"]
+    end
+    r1a -. synth/emul .-> PLAT
+    r1a ==>|Doc CI fetch| r2a
+    r2a ==>|submodule pin| r3c
+    r2c ==>|submodule pin| r3a
+    r2a ==>|submodule pin| r4c
+    r3a -. FW binary load .-> PLAT
+    r4a -. Python on host .-> HOST
+    HOST ==>|NVMe / PCIe| PLAT
+    classDef contract fill:#fdf6b2,stroke:#b58900,stroke-width:2px,color:#1a1300;
+      </div>
+      <p class="caption">노란 블록 = SW-HW 계약. FW Repo 와 Test Repo 가 <strong>같은 doc-tag</strong> 를 보면 검증 결과가 결정론적으로 해석된다 (Release gate R1).</p>
+
+      <table class="stages-table">
+        <thead><tr><th>Repo</th><th>내용</th><th>책임자</th><th>실행 위치 / 출구</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① RTL</strong></td><td><code>rtl/**/*.sv</code>, lint·synth 설정</td><td>RTL designer</td><td>FPGA bitstream · Veloce/Zebu image</td></tr>
+          <tr class="hl"><td><strong>② Doc</strong></td><td>HLD · DLD · Programmer's Guide (Markdown), SFR (SystemRDL <code>.rdl</code> + IP-XACT XML auto-gen), <strong>HAL.h auto-gen</strong></td><td>RTL · SW · Architect</td><td>tag release. FW·Test 가 submodule 로 소비</td></tr>
+          <tr><td><strong>③ FW</strong></td><td>HAL <code>.c</code> 구현, driver, app firmware. <code>doc/</code> = Doc Repo submodule</td><td>FW team</td><td>FPGA · Veloce · Zebu 에 load 되어 실행</td></tr>
+          <tr><td><strong>④ Test</strong></td><td><strong>Python coverif scenarios</strong>, NVMe/PCIe host helper. <code>doc/</code> = Doc Repo submodule</td><td>DV / Validation team</td><td><strong>SSD Host</strong> (Linux 서버) 에서 실행</td></tr>
+        </tbody>
+      </table>
+
+      <p style="margin-top:14px">
+        <strong>CI invariants</strong>: Doc D1–D5 · FW F1–F3 · Test T1–T4 · Release gate R1 (<code>FW.doc-SHA == Test.doc-SHA</code>).
+        모든 PR 이 정합성 통과해야 머지. AI 가 HAL.c · Python scenarios 를 자동 생성하더라도 환각은 CI 가 차단.
+      </p>
+
+      <p style="margin-top:14px">
+        <strong>3개월 (12주) 일제 전환</strong>:
+        Word HLD/DLD → Markdown, Excel SFR → SystemRDL 자동 변환부터 시작해 전 IP 동시 컷오버.
+        <a href="report/#10-roadmap" style="font-weight:600">📘 §10 로드맵</a> ·
+        <a href="present/#20" style="font-weight:600">▶ 슬라이드 20 (12주 Gantt)</a>
+      </p>
+
+      <p class="caption" style="margin-top:18px; padding:10px 14px; background:#fff8c5; border-left:3px solid #b58900; border-radius:4px">
+        ⓘ 자세한 내용은
+        <a href="report/" style="font-weight:600">📘 제안 보고서</a> 와
+        <a href="present/" style="font-weight:600">▶ 발표 슬라이드 (21장)</a> 참조.
+        아래 §1–§5 는 <strong>본 레포 단일 저장소 안에서 9-stage closed-loop 을 실증</strong>한 <em>개념 증명</em>이다.
+      </p>
+    </section>
+
+    <!-- ─────────── Section 1: 9-stage Workflow (Concept Proof) ─────────── -->
     <section id="workflow">
-      <h2>1. 전체 흐름</h2>
-      <p>9-stage closed-loop. <strong>Programmer's Guide (Stage 5)</strong> 가 SW-HW 계약이며, scenarios (Stage 7) 가 그 계약을 RTL 검증으로 옮긴다.</p>
+      <h2>1. 9-stage closed-loop — 개념 증명 (단일 저장소)</h2>
+      <p>본 절부터의 9-stage workflow 는 위 §0 운영 모델의 <strong>single-repo 압축 형태</strong>이다. <strong>Programmer's Guide (Stage 5)</strong> 가 SW-HW 계약이며, scenarios (Stage 7) 가 그 계약을 RTL 검증으로 옮긴다. 운영에서는 Stage 6–8 이 FW Repo · Test Repo 로 분리되고, Stage 8 의 SV TB 는 FPGA/Veloce/Zebu + Python on SSD Host 로 대체된다.</p>
 
       <div class="mermaid">
 flowchart TD
