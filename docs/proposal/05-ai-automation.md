@@ -10,17 +10,17 @@
 
 | # | 실행 저장소 | 입력 (AI가 읽는 것) | 출력 (AI가 쓰는 것) | 검증 게이트 |
 |---|---|---|---|---|
-| A | **Doc Repo** | RTL Repo의 `*.sv` (fetch) + DLD §5 표 초안 | `doc/<ip>/*.ipxact.xml` | D1 / D2 |
-| B | **Doc Repo** | `doc/<ip>/*.ipxact.xml` | `include/<ip>_hal.h` (auto-gen) | D3 |
+| A | **Doc Repo** | RTL Repo의 `*.sv` (fetch) + DLD §5 표 초안 | `doc/<ip>/<ip>.rdl` (SystemRDL) 또는 `.ipxact.xml` | D1 / D2 |
+| B | **Doc Repo** | `<ip>.rdl` 또는 `.ipxact.xml` | `include/<ip>_hal.h` (auto-gen via peakrdl/ipxact2c) | D3 |
 | C | **FW Repo** | `doc/include/<ip>_hal.h` (submodule) + `doc/<ip>/PROGRAMMERS_GUIDE.md` (submodule) | `fw/hal/<ip>_hal.c` 구현체 | F1 + host smoke |
-| D | **FW Repo** | `doc/<ip>/PROGRAMMERS_GUIDE.md §6, §8` (submodule) | `tests/scenarios/<ip>/*.py` (Python coverif) | F2 / F3 |
+| D | **Test Repo** | `doc/<ip>/PROGRAMMERS_GUIDE.md §6, §8` (submodule) | `tests/scenarios/<ip>/*.py` (SSD Host용 Python coverif) | T1 / T2 |
 
 각 시나리오의 공통 특징:
-- **AI는 git 안의 마크다운/XML/Verilog/Python을 직접 read** 한다 (RAG 없음).
+- **AI는 git 안의 마크다운/RDL/XML/Verilog/Python을 직접 read** 한다 (RAG 없음).
 - **출력은 해당 저장소의 PR**. CI invariant가 정합성을 강제하므로
   AI 환각은 머지 단계에서 차단된다.
 - **시나리오 A, B는 Doc Repo**가 닫는다 → Doc Repo가 새 tag를 release.
-- **시나리오 C, D는 FW Repo**가 `doc/` submodule을 새 tag로 갱신한 직후 자동 실행.
+- **시나리오 C는 FW Repo**가, **시나리오 D는 Test Repo**가 각자 자기 `doc/` submodule을 새 tag로 갱신한 직후 자동 실행.
 - **사람의 역할은 의도 검토** — 즉 "기능이 맞는가"에 집중하고 "이름이
   맞는가"는 CI가 본다.
 
@@ -49,12 +49,26 @@
    ↓
 [LLM context] 정확히 3개 파일 — 모두 FW Repo working copy 안
    ↓
-[출력] HAL .c 패치 + Python scenario stub
-       → CI가 F1, F2 invariant + host smoke로 검증
+[출력] HAL .c 패치 → FW Repo CI가 F1 + host smoke 로 검증
 ```
 
-submodule pin이 같으면 동일 질의는 항상 같은 컨텍스트를 본다. RTL은
-참고할 필요가 없다 — 인터페이스 계약은 doc submodule이 이미 갖고 있다.
+### 본 제안의 AI 컨텍스트 주입 (Test Repo 시점)
+```
+[질의] "Guide §6.2 admin queue enable worked example 을 Python으로 변환 ..."
+   ↓
+[AI 도구 호출]  Read("doc/nvme_ctrl/PROGRAMMERS_GUIDE.md")   # submodule (§6, §8)
+               Read("tests/lib/nvme_host.py")                # Host NVMe helper
+   ↓
+[LLM context] 2개 파일 — 모두 Test Repo working copy 안
+   ↓
+[출력] tests/scenarios/nvme_ctrl/sc_admin_queue_enable.py
+       → Test Repo CI가 T1 + pytest --collect-only 로 검증
+```
+
+submodule pin이 같으면 동일 질의는 항상 같은 컨텍스트를 본다. **FW와
+Test 두 저장소가 자기 doc submodule을 각자 들고 있어** 컨텍스트가
+교차오염되지 않는다. RTL은 참고할 필요가 없다 — 인터페이스 계약은
+doc submodule이 이미 갖고 있다.
 
 차이는 단순한 효율이 아니다. **재현 가능성**과 **검증 가능성**이
 근본적으로 다르다.
@@ -116,29 +130,30 @@ submodule pin이 같으면 동일 질의는 항상 같은 컨텍스트를 본다
 - **검증**: F1 (HAL.c export ↔ HAL.h) + `make test` host smoke (F5)
 - **사람의 검토 초점**: 함수 내부 로직의 의도, ISR/락 처리, 펌웨어 컨벤션
 
-### 시나리오 D — Guide → Python coverif scenarios (FW Repo)
-- **저장소**: FW Repo
+### 시나리오 D — Guide → Python coverif scenarios (Test Repo, SSD Host용)
+- **저장소**: Test Repo (FW Repo와 분리)
 - **AI 도구**: Read + Write
 - **입력**: `doc/<ip>/PROGRAMMERS_GUIDE.md §6` (worked examples), §8 (pitfalls)
 - **출력**:
-  - `tests/scenarios/<ip>/sc_<example>.py` — Worked example을 FW 호출 시퀀스로 변환 (NVMe 명령 / config / 검증 assertion)
+  - `tests/scenarios/<ip>/sc_<example>.py` — Worked example을 SSD Host에서 NVMe/PCIe 명령 시퀀스로 변환
   - `tests/scenarios/<ip>/regress_<pitfall>.py` — Pitfall을 회귀 시나리오로
-- **검증**: F2 (worked example ↔ scenario), F3 (pitfall ↔ regression). 실측 실행은 FPGA / Veloce / Zebu에서 nightly + regress
+- **검증**: T1 (worked example ↔ scenario), T2 (pitfall ↔ regression). 실측 실행은 SSD Host가 NVMe 드라이버를 통해 FPGA/Veloce/Zebu의 펌웨어를 구동 (nightly + on-demand regress)
 - **사람의 검토 초점**: scenario coverage, 측정 가능성 (latency·error 카운트·전력 시퀀스), pre/post 검증의 정확성
 
-> **Python scenario 포맷 (예시 스케치)**:
+> **Python scenario 포맷 (예시 스케치 — SSD Host)**:
 > ```python
-> def sc_admin_queue_enable(dut, hal):
->     """ Guide §6.2: admin queue enable 시퀀스 """
->     hal.reset()
->     assert hal.read(STATUS) == 0
->     hal.write(ADMIN_BASE, dut.dma_buf.addr)
->     hal.write(CTRL_EN, 1)
->     dut.wait_until(lambda: hal.read(STATUS) & READY, timeout_us=100)
->     # post-condition
->     assert dut.metric("admin_q_doorbell_count") >= 1
+> def sc_admin_queue_enable(host):
+>     """ Guide §6.2: admin queue enable 시퀀스 (SSD Host 관점) """
+>     # host = NVMe driver wrapper (PCIe로 SoC에 연결)
+>     host.controller_reset()
+>     assert host.csts() == 0
+>     host.set_admin_queue_base(host.dma_buf.addr)
+>     host.cc_enable(1)                                    # CC.EN = 1
+>     host.wait_csts_ready(timeout_ms=10)                  # CSTS.RDY
+>     # post-condition (admin doorbell counter via vendor command)
+>     assert host.vendor_metric("admin_q_doorbell_count") >= 1
 > ```
-> `dut`는 FPGA/Veloce/Zebu 백엔드 추상화, `hal`은 빌드된 펌웨어의 HAL 호출 프록시.
+> `host`는 SSD Host에서 NVMe 디바이스를 추상화한 helper. 백엔드(FPGA / Veloce / Zebu)는 PCIe transactor 차이만 있을 뿐 같은 API로 보임.
 
 ---
 
@@ -148,11 +163,12 @@ submodule pin이 같으면 동일 질의는 항상 같은 컨텍스트를 본다
 
 | AI가 자동 생성하는 산출물 | AI가 자동 수정하지 않는 산출물 |
 |---|---|
-| `doc/*.ipxact.xml` (초안) | RTL Repo의 `*.sv` (의도가 농축됨) |
-| `doc/include/*_hal.h` (auto-gen) | `doc/<ip>/DLD.md §1–4` (의도 설명) |
-| `fw/hal/*.c` (초안) | `doc/<ip>/PROGRAMMERS_GUIDE.md` (저자 = SW lead) |
-| `tests/scenarios/*.py` (worked example 변환) | Python scenario의 측정·assertion 의도 (DV 리뷰) |
+| `doc/<ip>/*.rdl` 또는 `*.ipxact.xml` (초안) — Doc Repo | RTL Repo의 `*.sv` (의도가 농축됨) |
+| `doc/include/*_hal.h` (auto-gen) — Doc Repo | `doc/<ip>/DLD.md §1–4` (의도 설명) |
+| `fw/hal/*.c` (초안) — FW Repo | `doc/<ip>/PROGRAMMERS_GUIDE.md` (저자 = SW lead) |
+| `tests/scenarios/*.py` (worked example 변환) — Test Repo | Python scenario의 측정·assertion 의도 (DV 리뷰) |
 | Doxygen 주석 | FW 측 ISR / 락 / DMA 정책 (FW lead 리뷰) |
+| Test 측 NVMe wrapper / host helper 보강 | Test 측 host transactor 정책·플랫폼 매핑 (Validation 리뷰) |
 
 이 boundary는 "AI는 사실(facts) 정합성은 자동화하고, **의도(intent)**는
 사람이 정의한다"는 원칙에 기반한다. RTL과 가이드는 의도가 농축된 산출물

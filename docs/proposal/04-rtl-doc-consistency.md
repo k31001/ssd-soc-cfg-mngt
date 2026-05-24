@@ -19,11 +19,13 @@
 
 ---
 
-## 4.2 Invariant — 저장소별로 책임이 갈라진다
+## 4.2 Invariant — 3개 저장소(Doc / FW / Test) CI로 분산
 
 정합성 검사는 한 곳에서 모두 일어나지 않는다. **Doc Repo CI**는 RTL과
-문서의 일치를, **FW Repo CI**는 그 문서(submodule)와 펌웨어·시나리오의
-일치를 본다.
+문서의 일치를, **FW Repo CI**는 그 문서(submodule)와 펌웨어의 일치를,
+**Test Repo CI**는 그 문서와 Python coverif scenario의 일치를 본다.
+경계 위의 일관성(FW와 Test가 같은 doc-tag를 보고 있는가)은 **release
+gate**가 본다.
 
 ### 4.2.1 Doc Repo CI invariant
 
@@ -32,70 +34,110 @@ Doc Repo는 PR 시점에 RTL Repo를 read-only fetch한 뒤 다음을 검사한�
 | # | Invariant | Source A | Source B |
 |---|---|---|---|
 | D1 | RTL ↔ DLD §5 register map | RTL Repo의 `rtl/**/*.sv` (fetch) | `doc/<ip>/DLD.md §5` |
-| D2 | DLD §5 ↔ IP-XACT | `doc/<ip>/DLD.md §5` | `doc/<ip>/*.ipxact.xml` |
-| D3 | IP-XACT ↔ HAL header | `doc/<ip>/*.ipxact.xml` | `include/<ip>_hal.h` (자동 생성) |
+| D2 | DLD §5 ↔ SFR (RDL/XACT) | `doc/<ip>/DLD.md §5` | `doc/<ip>/<ip>.rdl` 또는 `.ipxact.xml` |
+| D3 | SFR ↔ HAL.h (auto-gen) | `<ip>.rdl` / `.ipxact.xml` | `include/<ip>_hal.h` |
 | D4 | Diagram source ↔ SVG | `doc/<ip>/diagrams/*.json` | `doc/<ip>/diagrams/*.svg` |
-| D5 | HAL header ↔ Programmer's Guide §6 함수 목록 | `include/<ip>_hal.h` | `doc/<ip>/PROGRAMMERS_GUIDE.md §6` |
+| D5 | HAL.h ↔ Programmer's Guide §6 함수 목록 | `include/<ip>_hal.h` | `doc/<ip>/PROGRAMMERS_GUIDE.md §6` |
 
-Doc Repo가 PR pass + 새 tag release하면, FW Repo는 그 tag로 submodule을 끌어올린다.
+Doc Repo가 PR pass + 새 tag release하면, **FW Repo와 Test Repo가 모두**
+그 tag로 submodule을 끌어올린다.
 
 ### 4.2.2 FW Repo CI invariant
 
 FW Repo는 Doc Repo가 `doc/`에 submodule로 mount되어 있는 상태에서
-다음을 검사한다:
+펌웨어 영역을 검사한다:
 
 | # | Invariant | Source A | Source B |
 |---|---|---|---|
-| F1 | HAL `.c` export ↔ HAL `.h` (submodule) | `doc/include/<ip>_hal.h` | `fw/hal/<ip>_hal.c` |
-| F2 | Python scenarios ↔ Guide §6 worked example | `doc/<ip>/PROGRAMMERS_GUIDE.md §6` | `tests/scenarios/<ip>/*.py` |
-| F3 | Python scenarios ↔ Guide §8 pitfall (회귀) | `doc/<ip>/PROGRAMMERS_GUIDE.md §8` | `tests/scenarios/<ip>/regress_*.py` |
-| F4 | Submodule SHA 진행 (단조 증가) | `doc/` submodule SHA | 이전 release tag |
-| F5 | Host smoke pass | `fw/hal/*_hal.c` + `tests/host/*.py` | `make test` 결과 |
+| F1 | HAL.c export ↔ HAL.h (submodule) | `doc/include/<ip>_hal.h` | `fw/hal/<ip>_hal.c` |
+| F2 | FW Repo `doc/` SHA 단조 증가 | `doc/` submodule SHA | 이전 release tag |
+| F3 | Host smoke pass | `fw/hal/*_hal.c` + `fw/tests/host/*` | `make test` 결과 |
 
-### 4.2.3 본 레포의 참조 구현 — Concept 검증
+### 4.2.3 Test Repo CI invariant
+
+Test Repo는 같은 Doc Repo submodule을 mount한 상태에서 SSD Host에서
+실행될 Python coverif scenario의 정합성을 검사한다:
+
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| T1 | Python scenarios ↔ Guide §6 worked example | `doc/<ip>/PROGRAMMERS_GUIDE.md §6` | `tests/scenarios/<ip>/sc_*.py` |
+| T2 | Python regression ↔ Guide §8 pitfall | `doc/<ip>/PROGRAMMERS_GUIDE.md §8` | `tests/scenarios/<ip>/regress_*.py` |
+| T3 | Test Repo `doc/` SHA 단조 증가 | `doc/` submodule SHA | 이전 release tag |
+| T4 | Scenario static check (pytest collect, lint) | `tests/scenarios/**/*.py` | `pytest --collect-only` 결과 |
+
+### 4.2.4 Release gate — FW와 Test의 doc 정렬
+
+릴리스 매니페스트를 만드는 별도 CI 단계(또는 사람 사인오프)가 다음을 강제한다:
+
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| R1 | FW와 Test가 같은 doc-tag를 본다 | FW Repo의 `doc/` SHA | Test Repo의 `doc/` SHA |
+| R2 | Release manifest의 4-tuple 완결 | `rtl-v* × doc-v* × fw-v* × test-v*` | 모든 tag 존재·접근 가능 |
+
+R1이 위반되면 "FW는 doc v2.5, Test는 doc v2.4로 검증" 같은 미세 분기가
+발생해 결과 해석이 불가능해진다. 따라서 release 시점 강제.
+
+### 4.2.5 본 레포의 참조 구현 — Concept 검증
 
 본 레포 [`tools/ipflow.py`](../../tools/ipflow.py)는 이 invariant들의
 **개념 증명**으로, 한 저장소 안에서 모든 단계를 실증한다 (`scenarios.yaml`
-+ SV TB는 IP-level smoke). 실제 운영은 위 3-repo 분리 모델로 이행하며,
-같은 6+종 invariant가 Doc Repo CI와 FW Repo CI에 흩어진다.
++ SV TB는 IP-level smoke). 실제 운영은 위 4-repo 분리 모델로 이행하며,
+같은 invariant가 Doc / FW / Test 저장소 CI에 흩어진다.
 
 ---
 
-## 4.3 CI에서의 흐름 — 3-repo 파이프라인
+## 4.3 CI에서의 흐름 — 4-repo 파이프라인
 
 ```mermaid
 flowchart LR
-    subgraph RTLPR["RTL Repo · PR"]
+    subgraph RTLPR["① RTL Repo · PR"]
       P1[PR] --> P2[lint / smoke synth] --> P3[merge + tag]
     end
 
-    subgraph DOCPR["Doc Repo · PR"]
-      D_PR[PR] --> D_FETCH["RTL Repo<br/>read-only fetch"]
-      D_FETCH --> D_VAL["validate D1–D5<br/>(RTL ↔ doc, IP-XACT ↔ HAL.h)"]
-      D_VAL -->|pass| D_GEN["HAL .h 자동 생성<br/>(IP-XACT → C header)"]
+    subgraph DOCPR["② Doc Repo · PR"]
+      D_PR[PR] --> D_FETCH["RTL read-only fetch"]
+      D_FETCH --> D_VAL["validate D1–D5"]
+      D_VAL -->|pass| D_GEN["HAL.h auto-gen<br/>(peakrdl 또는 ipxact2c)"]
       D_GEN --> D_TAG[merge + tag]
       D_VAL -. fail .-> D_BLK[PR blocked]
     end
 
-    subgraph FWPR["FW Repo · PR"]
-      F_PR[PR] --> F_SUB["doc/ submodule<br/>tag 갱신"]
-      F_SUB --> F_VAL["validate F1–F5<br/>(HAL.c ↔ HAL.h, Python ↔ Guide)"]
-      F_VAL -->|pass| F_BUILD["FW build +<br/>host smoke"]
-      F_BUILD -->|pass| F_COV["FPGA / Veloce / Zebu<br/>Python scenarios coverif<br/>(nightly · regress)"]
-      F_COV -->|pass| F_TAG[merge + tag]
+    subgraph FWPR["③ FW Repo · PR"]
+      F_PR[PR] --> F_SUB["doc/ submodule update"]
+      F_SUB --> F_VAL["validate F1–F3<br/>(HAL.c ↔ HAL.h)"]
+      F_VAL -->|pass| F_BUILD["FW build + host smoke"]
+      F_BUILD -->|pass| F_TAG[merge + tag]
       F_VAL -. fail .-> F_BLK[PR blocked]
       F_BUILD -. fail .-> F_BLK
-      F_COV -. fail .-> F_BLK
     end
 
-    P3 -. "Doc Repo CI가<br/>read-only fetch" .-> D_FETCH
-    D_TAG -. "git submodule update --remote" .-> F_SUB
+    subgraph TESTPR["④ Test Repo · PR"]
+      T_PR[PR] --> T_SUB["doc/ submodule update"]
+      T_SUB --> T_VAL["validate T1–T4<br/>(Python ↔ Guide)"]
+      T_VAL -->|pass| T_COL["pytest --collect-only<br/>+ lint"]
+      T_COL --> T_TAG[merge + tag]
+      T_VAL -. fail .-> T_BLK[PR blocked]
+    end
+
+    subgraph REL["⑤ Release Gate (nightly + sign-off)"]
+      R_GATE["R1: FW.doc-SHA == Test.doc-SHA"]
+      R_GATE --> COV["FPGA · Veloce · Zebu<br/>위에 FW load + SSD Host에서<br/>Python regress 수행"]
+    end
+
+    P3 -. fetch .-> D_FETCH
+    D_TAG -. submodule update .-> F_SUB
+    D_TAG -. submodule update .-> T_SUB
+    F_TAG --> R_GATE
+    T_TAG --> R_GATE
 ```
 
 각 저장소의 CI 정의가 분리되어 있으면 (a) 권한이 자연스럽게 분리되고
-(b) PR latency가 짧으며 (c) 실패 시 책임 부서가 명확하다. **본 레포의
-[`.github/workflows/ipflow-validate.yml`](../../.github/workflows/ipflow-validate.yml)
-는 이 3개의 파이프라인을 한 저장소에서 합쳐 구현한 학습용 참조**이다.
+(b) PR latency가 짧으며 (c) 실패 시 책임 부서가 명확하다. (a) Doc PR이
+RTL/FW/Test의 PR을 blocking하지 않고, (b) FW와 Test가 같은 doc-tag를
+보고 있는가는 release gate에서만 강제된다.
+
+**본 레포의 [`.github/workflows/ipflow-validate.yml`](../../.github/workflows/ipflow-validate.yml)
+는 이 4개의 파이프라인을 한 저장소에서 합쳐 구현한 학습용 참조**이다.
 
 ---
 
@@ -118,13 +160,13 @@ flowchart LR
   믿을 필요가 없고, CI가 신뢰의 마지막 관문이 된다.
 
 ### (d) 문서 ↔ 검증의 닫힌 루프
-- Programmer's Guide §6의 worked example이 FW Repo의 Python scenario에
-  등재되지 않으면 **F2 invariant fail**.
-- Guide §8의 pitfall이 회귀 시나리오로 변환되지 않으면 **F3 invariant fail**.
-- 즉 "**문서가 약속한 것은 반드시 펌웨어로 실측된다**." 가이드가 곧
+- Programmer's Guide §6의 worked example이 Test Repo의 Python scenario에
+  등재되지 않으면 **T1 invariant fail**.
+- Guide §8의 pitfall이 회귀 시나리오로 변환되지 않으면 **T2 invariant fail**.
+- 즉 "**문서가 약속한 것은 반드시 검증된다**." 가이드가 곧
   verification plan이 되며, 별도 v-plan 산출물이 필요 없어진다.
-- 실측 플랫폼은 SV TB가 아니라 **FPGA + Veloce/Zebu에서 실제 펌웨어가
-  실행**되며, Python scenario가 NVMe 명령·전력 시퀀스·에러 주입을 구동.
+- 실측 플랫폼은 SV TB가 아니라 **FPGA + Veloce/Zebu에서 펌웨어가
+  실행**되고, **SSD Host의 Python**이 NVMe·PCIe 명령·전력 시퀀스·에러 주입을 구동한다 — 실제 SSD가 동작하는 환경과 동일.
 
 ---
 

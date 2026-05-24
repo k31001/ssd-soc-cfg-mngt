@@ -3,10 +3,11 @@
 > 본 보고서는 SoC 설계·검증 프로세스를 AI 친화적으로 전환하기 위한
 > **산출물(deliverables) 관리 전략**을 제안한다. 핵심은 단 한 줄로 요약된다:
 >
-> **"RTL · Doc · FW의 3개 저장소로 분리하고, FW가 Doc를 단방향 submodule로
-> 끌어온다. 모든 산출물은 마크다운, RTL은 single source of truth, 정합성은
-> 저장소별 CI invariant가 강제한다. 검증은 FW + Python coverif가 FPGA ·
-> Veloce · Zebu 위에서 실제 SSD Controller 시나리오를 수행한다."**
+> **"RTL · Doc · FW · Test 4개 저장소로 분리하고, FW와 Test는 각자 Doc를
+> 단방향 submodule로 끌어온다. 모든 문서는 마크다운, SFR은 SystemRDL(또는
+> IP-XACT XML), RTL은 single source of truth, 정합성은 저장소별 CI
+> invariant가 강제한다. 검증은 FW가 FPGA · Veloce · Zebu 위에서 실행되는
+> 동안 SSD Host의 Python scenarios가 NVMe/PCIe로 그 펌웨어를 구동한다."**
 
 ---
 
@@ -14,13 +15,15 @@
 
 | 축 | 우리의 선택 | 대안 (배제 사유) |
 |---|---|---|
-| 저장소 토폴로지 | **RTL Repo · Doc Repo · FW Repo의 3-repo + FW→Doc 단방향 submodule** | 단일 super-repo (권한 분리 곤란), 양방향 submodule (의존 순환) |
-| 문서 포맷 | **Markdown + Mermaid + WaveDrom** | Confluence (lock-in, diff 불가), DOCX/PDF (정합성 검증 불가) |
+| 저장소 토폴로지 | **RTL · Doc · FW · Test 4-repo + Doc→{FW,Test} fan-out submodule** | 단일 super-repo (권한 분리 곤란), 3-repo (FW와 Test 분리 안 됨) |
+| 문서 포맷 | **Markdown + Mermaid + WaveDrom** | Word·DOCX (정합성 검증 불가), Confluence (lock-in) |
+| SFR 포맷 | **SystemRDL `.rdl`** author + **IP-XACT 1685-2022 XML** interchange (peakrdl emit) | Excel (현재 상태 — diff·CI 검증 불가), XML 직접 편집 (비친화적) |
 | 검색·검증 | **grep / ripgrep + 저장소별 CI invariant** | RAG / Vector DB (재인덱싱·청크 손실·환각) |
-| AI 컨텍스트 주입 | **FW Repo의 `doc/` submodule 직접 read** | MCP 문서검색 (토큰 폭증·latency) |
+| AI 컨텍스트 주입 | **FW · Test 각자의 `doc/` submodule 직접 read** | MCP 문서검색 (토큰 폭증·latency) |
 | 단일 진실 원천 | **Verilog RTL Repo** (Doc Repo가 CI로 미러) | 별도 spec 문서 (RTL과 정합성 깨짐) |
-| 산출물 5종 (Doc Repo) | HLD / DLD / Programmer's Guide / SFR (IP-XACT 1685-2022) / HAL.h | 일원화된 단일 문서 (역할 혼재) |
-| 검증 방식 | **FW + Python coverif on FPGA · Veloce · Zebu** (HW/SW coverif) | SV TB만 (실제 NVMe 펌웨어 흐름 미반영) |
+| 산출물 5종 (Doc Repo) | HLD / DLD / Programmer's Guide / SFR (SystemRDL+IP-XACT) / HAL.h | 일원화된 단일 문서 (역할 혼재) |
+| 펌웨어 실행 위치 | **FPGA · Veloce · Zebu에 FW binary 로드** | RTL TB만 (실제 펌웨어 흐름 미반영) |
+| 검증 시나리오 실행 위치 | **SSD Host (Linux 서버)의 Python**, NVMe/PCIe로 SoC 구동 | SoC 안의 self-check (실제 환경과 괴리) |
 
 ---
 
@@ -44,9 +47,10 @@
 
 ## 다음 액션 (요약)
 
-1. **Phase 1 (0–3개월)**: 본 워크플로우의 참조 IP(`irq_ctrl`, `trng`)를 모든 신규 IP의 템플릿으로 표준화. 모든 IP 폴더가 9-stage 산출물 구조를 따르도록 강제.
-2. **Phase 2 (3–6개월)**: SFR/HAL/Header 자동 생성기를 `tools/ipflow.py`에 흡수, AI 어시스턴트가 Programmer's Guide → HAL 코드를 1-shot으로 생성하도록 컨텍스트 패키지를 정형화.
-3. **Phase 3 (6–12개월)**: 기존 in-house IP를 점진적으로 본 구조로 마이그레이션. EDA 벤더 AI 솔루션 락인을 회피하면서 동등 효과 확보.
+0. **Phase 0 (0–2개월 · 마이그레이션 prerequisite)**: 현재 Word 문서 (HLD/DLD)와 Excel SFR 표를 **마크다운 + SystemRDL `.rdl`** 로 일괄 변환. Pandoc + 자동 변환 스크립트로 사람이 만지는 페이지 최소화.
+1. **Phase 1 (2–5개월)**: 4-repo (RTL · Doc · FW · Test) 토폴로지 셋업. Doc Repo의 D1–D5 invariant, FW Repo의 F1–F3, Test Repo의 T1–T4 CI 가동. 참조 IP 1–2종을 신규 IP의 카피러프트 템플릿으로 표준화.
+2. **Phase 2 (5–8개월)**: AI 어시스턴트가 Programmer's Guide → HAL.c (FW Repo), Programmer's Guide → Python scenarios (Test Repo)를 1-shot으로 생성하도록 컨텍스트 패키지를 정형화. Release gate R1 (`FW.doc-SHA == Test.doc-SHA`) 자동화.
+3. **Phase 3 (8–12개월)**: 기존 in-house IP를 점진적으로 본 구조로 마이그레이션. EDA 벤더 AI 솔루션 락인을 회피하면서 동등 효과 확보.
 
 세부 내용은 다음 11개 챕터에서 단계별로 정당화한다.
 

@@ -34,20 +34,21 @@
     <div class="card">
       <h4>우리의 선택</h4>
       <ul>
-        <li><strong>3-repo</strong>: RTL · Doc · FW (단방향 submodule FW→Doc)</li>
-        <li><strong>Markdown</strong> + Mermaid + WaveDrom · IP-XACT</li>
-        <li><strong>5종 문서 산출물</strong> (HLD/DLD/PG/SFR/HAL.h)</li>
+        <li><strong>4-repo</strong>: RTL · Doc · FW · Test (Doc→{FW,Test} fan-out submodule)</li>
+        <li><strong>Markdown</strong> + Mermaid · <strong>SystemRDL/IP-XACT</strong> (SFR)</li>
+        <li><strong>5종 문서 산출물</strong> (HLD/DLD/PG/SFR/HAL.h) — 모두 Doc Repo</li>
         <li><strong>RTL</strong>을 single source of truth로</li>
-        <li><strong>FW + Python coverif</strong> on FPGA · Veloce · Zebu</li>
+        <li><strong>FW</strong>는 FPGA·Veloce·Zebu에 load, <strong>Python</strong>은 <strong>SSD Host</strong>에서 실행</li>
       </ul>
     </div>
     <div class="card">
-      <h4>배제한 것</h4>
+      <h4>배제한 것 · 마이그레이션 대상</h4>
       <ul>
+        <li>Word HLD/DLD (현재) → Markdown</li>
+        <li>Excel SFR (현재) → <strong>SystemRDL `.rdl`</strong></li>
         <li>Confluence · DOCX · PDF (정합성 검증 불가)</li>
-        <li>단일 super-repo (권한 분리 곤란)</li>
-        <li>벡터DB · 임베딩 RAG (재인덱싱 · 청크 · 환각)</li>
-        <li>MCP 문서검색 (토큰·latency 폭증)</li>
+        <li>단일 super-repo (권한·릴리스 주기 분리 곤란)</li>
+        <li>벡터DB · MCP 문서검색 (토큰·환각·latency)</li>
         <li>EDA 벤더 AI 락인</li>
       </ul>
     </div>
@@ -190,48 +191,50 @@ Test scenarios.docx     ─ Jira 첨부
   </div>
 </section>
 
-<!-- ─────────────────── 08. 제안 아키텍처 — 3-repo ─────────────────── -->
+<!-- ─────────────────── 08. 제안 아키텍처 — 4-repo ─────────────────── -->
 <section class="slide">
   <div class="kicker">제안</div>
-  <h2>한 장의 아키텍처 — 3개 저장소 + 단방향 submodule</h2>
+  <h2>한 장의 아키텍처 — 4개 저장소 + Doc fan-out</h2>
   <div class="mermaid">
 flowchart LR
     subgraph R1["① RTL Repo"]
       r1a[rtl/**/*.sv]
-      r1b["lint · synth"]
     end
     subgraph R2["② Doc Repo (tag-released)"]
-      r2a["HLD / DLD<br/>PROGRAMMERS_GUIDE"]:::contract
-      r2b["*.ipxact.xml<br/>(SFR)"]
-      r2c["include/&lt;ip&gt;_hal.h<br/>(auto-gen)"]
+      r2a["HLD / DLD / PG"]:::contract
+      r2b["&lt;ip&gt;.rdl (SystemRDL)<br/>또는 *.ipxact.xml"]
+      r2c["include/&lt;ip&gt;_hal.h<br/>(peakrdl auto-gen)"]
     end
-    subgraph R3["③ FW Repo (consumes Doc as submodule)"]
+    subgraph R3["③ FW Repo · FPGA·Emul에 load"]
       r3a["fw/hal/*.c<br/>fw/drivers · fw/app"]
-      r3b["tests/scenarios/*.py<br/>(Python coverif)"]
-      r3c["doc/ ← submodule (tag pin)"]:::contract
+      r3c["doc/ ← submodule"]:::contract
     end
-    subgraph HW["검증 플랫폼"]
-      hw1[FPGA]
-      hw2["Veloce / Zebu"]
+    subgraph R4["④ Test Repo · SSD Host에서 실행"]
+      r4a["tests/scenarios/*.py<br/>(NVMe / PCIe coverif)"]
+      r4c["doc/ ← submodule"]:::contract
     end
-    r1a -. "synth / emulate" .-> hw1
-    r1a -. "synth / emulate" .-> hw2
-    r1a ==>|"Doc CI<br/>read-only fetch"| r2a
-    r2a ==>|"submodule update<br/>(tag pin)"| r3c
-    r2c ==>|"submodule update"| r3a
-    r3a --> r3b
-    r3b -. "Python이 FW 구동" .-> hw1
-    r3b -. "Python이 FW 구동" .-> hw2
+    subgraph HW["검증 환경"]
+      HOST["💻 SSD Host<br/>(PCIe · NVMe)"]
+      PLAT["🔧 FPGA · Veloce · Zebu<br/>(SoC + FW)"]
+    end
+    r1a -. synth / emul .-> PLAT
+    r1a ==>|Doc CI fetch| r2a
+    r2a ==>|submodule pin| r3c
+    r2c ==>|submodule pin| r3a
+    r2a ==>|submodule pin| r4c
+    r3a -. FW binary load .-> PLAT
+    r4a -. Python on host .-> HOST
+    HOST ==>|NVMe / PCIe| PLAT
     classDef contract fill:#fdf6b2,stroke:#b58900,stroke-width:2px,color:#1a1300;
   </div>
-  <p class="lead">노란 블록 = <strong>SW-HW 계약</strong>. Doc Repo 한 곳에서 만들어 FW Repo가 tag로 핀.</p>
-  <div class="foot">SLIDE 08 — 3-repo 아키텍처</div>
+  <p class="lead">FW와 Test는 다른 저장소·다른 언어·다른 실행 환경. <strong>같은 Doc tag</strong>를 보면 SW-HW 계약이 정렬됨.</p>
+  <div class="foot">SLIDE 08 — 4-repo 아키텍처</div>
   <div class="notes">
     핵심 관찰점:
-    1) 3개 저장소가 독립적이고 권한이 자연스럽게 분리됨.
-    2) Submodule은 한 방향 — FW → Doc. RTL은 submodule이 아니라 Doc CI가 fetch해서 참조.
-    3) 검증 플랫폼은 SV TB가 아니라 FPGA + Veloce/Zebu. Python이 펌웨어를 구동.
-    4) "어느 RTL × 어느 doc × 어느 FW로 측정했나"가 항상 한 줄로 확정됨.
+    1) 4개 저장소 — RTL, Doc, FW(SoC 위에서 동작), Test(SSD Host에서 동작) 모두 독립.
+    2) Submodule fan-out — Doc → FW · Doc → Test. RTL은 어떤 곳의 submodule도 아님.
+    3) 검증 환경은 두 면 — FPGA/Veloce/Zebu (FW 실행) + SSD Host (Python 실행). PCIe/NVMe로 연결.
+    4) "rtl-v* × doc-v* × fw-v* × test-v*" 4-tuple로 어느 조합을 측정했는지 확정.
   </div>
 </section>
 
@@ -249,13 +252,13 @@ flowchart LR
       </tr>
       <tr>
         <td><strong>② 저장소 모델</strong></td>
-        <td>RTL · Doc · FW 3-repo + 단방향 submodule (FW→Doc, tag-pinned)</td>
+        <td>RTL · Doc · FW · Test 4-repo + Doc→{FW,Test} fan-out submodule</td>
         <td>본 레포 <code>cm-strategies/</code> 4전략 비교 결론</td>
       </tr>
       <tr>
-        <td><strong>③ SFR 표준</strong></td>
-        <td>IEEE 1685-2022 IP-XACT</td>
-        <td>2022-09 IEEE SA 승인 · Accellera 보충 2023-06</td>
+        <td><strong>③ SFR 포맷</strong></td>
+        <td><strong>SystemRDL `.rdl`</strong> (author) → <code>peakrdl</code>이 <strong>IP-XACT 1685-2022 XML</strong> + HAL.h + Markdown emit</td>
+        <td>Accellera SystemRDL 2.0 + IEEE SA 승인 (2022-09)</td>
       </tr>
       <tr>
         <td><strong>④ 검색·정합성</strong></td>
@@ -278,16 +281,17 @@ flowchart LR
   <table>
     <thead><tr><th>#</th><th>산출물</th><th>포맷</th><th>저장소</th><th>Diátaxis</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td><strong>HLD</strong> High Level Description</td><td>Markdown + Mermaid</td><td>Doc Repo</td><td>Explanation</td></tr>
+      <tr><td>1</td><td><strong>HLD</strong></td><td>Markdown + Mermaid</td><td>Doc Repo</td><td>Explanation</td></tr>
       <tr><td>2</td><td><strong>DLD</strong> (= DESIGN.md)</td><td>Markdown + Mermaid + WaveDrom</td><td>Doc Repo</td><td>Explanation + Reference</td></tr>
       <tr class="hl"><td>3</td><td><strong>Programmer's Guide</strong></td><td>Markdown</td><td>Doc Repo</td><td>Tutorials + How-to</td></tr>
-      <tr><td>4</td><td><strong>SFR</strong> (IP-XACT)</td><td>XML (IEEE 1685-2022)</td><td>Doc Repo</td><td>Reference (기계 판독)</td></tr>
-      <tr><td>5</td><td><strong>HAL.h</strong> (auto-gen from SFR)</td><td>C 헤더 + Doxygen</td><td>Doc Repo</td><td>Reference</td></tr>
-      <tr><td>+</td><td><strong>HAL.c · Python scenarios</strong></td><td>C / Python</td><td>FW Repo</td><td>실행·검증 산출물</td></tr>
+      <tr><td>4</td><td><strong>SFR</strong></td><td><strong>SystemRDL `.rdl`</strong> + IP-XACT XML (auto-gen)</td><td>Doc Repo</td><td>Reference (기계 판독)</td></tr>
+      <tr><td>5</td><td><strong>HAL.h</strong> (auto-gen)</td><td>C 헤더 + Doxygen</td><td>Doc Repo</td><td>Reference</td></tr>
+      <tr><td>+</td><td><strong>HAL.c</strong> (펌웨어 구현)</td><td>C source</td><td><strong>FW Repo</strong></td><td>실행 (FPGA·Veloce·Zebu)</td></tr>
+      <tr><td>+</td><td><strong>Python coverif scenarios</strong></td><td>Python (pytest)</td><td><strong>Test Repo</strong></td><td>검증 (SSD Host)</td></tr>
     </tbody>
   </table>
   <p class="lead" style="margin-top:14px">
-    1–5는 <strong>Doc Repo가 단일 출처</strong>. FW Repo가 <code>doc/</code> submodule로 소비하여 HAL.c와 Python coverif를 얹는다.
+    1–5는 <strong>Doc Repo가 단일 출처</strong>. FW Repo와 Test Repo가 각자 <code>doc/</code> submodule로 소비.
   </p>
   <div class="foot">SLIDE 10 — 산출물 5종</div>
   <div class="notes">
@@ -296,52 +300,62 @@ flowchart LR
   </div>
 </section>
 
-<!-- ─────────────────── 11. invariant — 저장소별 분리 ─────────────────── -->
+<!-- ─────────────────── 11. invariant — Doc / FW / Test 분리 + Release gate ─────────────────── -->
 <section class="slide">
   <div class="kicker">정합성 CI</div>
-  <h2>저장소별 invariant — Doc Repo CI · FW Repo CI</h2>
-  <div class="cols-2">
+  <h2>저장소별 invariant — Doc · FW · Test + Release gate</h2>
+  <div class="cols-3">
     <div class="card">
       <h4>② Doc Repo CI</h4>
-      <table style="font-size:15px">
-        <thead><tr><th>#</th><th>Invariant</th></tr></thead>
+      <table style="font-size:14px">
         <tbody>
-          <tr><td>D1</td><td>RTL ↔ DLD §5 register map</td></tr>
-          <tr><td>D2</td><td>DLD §5 ↔ IP-XACT</td></tr>
-          <tr><td>D3</td><td>IP-XACT ↔ HAL.h (auto-gen)</td></tr>
+          <tr><td>D1</td><td>RTL ↔ DLD §5</td></tr>
+          <tr><td>D2</td><td>DLD §5 ↔ SFR (RDL/XACT)</td></tr>
+          <tr><td>D3</td><td>SFR ↔ HAL.h (auto-gen)</td></tr>
           <tr><td>D4</td><td>Diagram source ↔ SVG</td></tr>
-          <tr><td>D5</td><td>HAL.h ↔ Guide §6 함수 시그너처</td></tr>
+          <tr><td>D5</td><td>HAL.h ↔ Guide §6 시그너처</td></tr>
         </tbody>
       </table>
-      <p style="font-size:15px; color:var(--muted); margin-top:6px">
-        RTL Repo를 <strong>read-only fetch</strong>하여 D1 검사. PR pass → 새 doc-tag.
+      <p style="font-size:13px; color:var(--muted); margin-top:6px">
+        RTL Repo를 <strong>read-only fetch</strong>하여 D1.
       </p>
     </div>
     <div class="card">
       <h4>③ FW Repo CI</h4>
-      <table style="font-size:15px">
-        <thead><tr><th>#</th><th>Invariant</th></tr></thead>
+      <table style="font-size:14px">
         <tbody>
-          <tr><td>F1</td><td>HAL.c export ↔ HAL.h (submodule)</td></tr>
-          <tr><td>F2</td><td>Python scenarios ↔ Guide §6 worked example</td></tr>
-          <tr><td>F3</td><td>Python regression ↔ Guide §8 pitfall</td></tr>
-          <tr><td>F4</td><td><code>doc/</code> submodule SHA 단조 증가</td></tr>
-          <tr><td>F5</td><td>Host smoke pass (make test)</td></tr>
+          <tr><td>F1</td><td>HAL.c ↔ HAL.h (submodule)</td></tr>
+          <tr><td>F2</td><td><code>doc/</code> SHA 단조 증가</td></tr>
+          <tr><td>F3</td><td>Host smoke pass (make test)</td></tr>
         </tbody>
       </table>
-      <p style="font-size:15px; color:var(--muted); margin-top:6px">
-        Doc submodule 갱신 직후 자동 실행. <strong>nightly: FPGA/Veloce/Zebu</strong> 위에서 Python scenario regress.
+      <p style="font-size:13px; color:var(--muted); margin-top:6px">
+        Doc submodule 갱신 직후 자동 실행. FW binary 빌드.
+      </p>
+    </div>
+    <div class="card">
+      <h4>④ Test Repo CI</h4>
+      <table style="font-size:14px">
+        <tbody>
+          <tr><td>T1</td><td>Python ↔ Guide §6 worked example</td></tr>
+          <tr><td>T2</td><td>Regress ↔ Guide §8 pitfall</td></tr>
+          <tr><td>T3</td><td><code>doc/</code> SHA 단조 증가</td></tr>
+          <tr><td>T4</td><td>pytest --collect-only + lint</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:13px; color:var(--muted); margin-top:6px">
+        nightly로 <strong>SSD Host에서 NVMe coverif</strong> 실행.
       </p>
     </div>
   </div>
-  <blockquote style="margin-top:14px">
-    어느 하나라도 깨지면 <strong>해당 저장소 PR이 자동 fail</strong>. 사람의 성실성에 의존하지 않는다.
-    <span class="source">— 본 레포 <code>tools/ipflow.py</code>가 한 저장소 내에서 동일 invariant 체크를 실증 (irq_ctrl·trng 두 IP에서 PASS)</span>
-  </blockquote>
-  <div class="foot">SLIDE 11 — D/F invariants</div>
+  <div class="card" style="margin-top:14px; background:rgba(253,246,178,0.08); border-color:#d29922">
+    <h4 style="color:#d29922">⑤ Release Gate (R1)</h4>
+    <p style="margin:6px 0"><code>FW Repo.doc-SHA == Test Repo.doc-SHA</code> — FW와 Test가 같은 doc tag를 보고 있는지 자동 강제. 위반 시 release 차단.</p>
+  </div>
+  <div class="foot">SLIDE 11 — D / F / T + R</div>
   <div class="notes">
-    invariant가 두 저장소에 분리되는 게 핵심. Doc Repo는 RTL과 문서의 일치를, FW Repo는 그 문서(submodule)와 펌웨어·시나리오의 일치를 봄.
-    "PR 시점에 자동 차단"이 본 제안의 가장 차별적 부분.
+    invariant가 3개 저장소에 분리되는 게 핵심. 그리고 FW와 Test가 같은 doc-tag를 보는지를 Release gate가 별도로 강제.
+    "PR 시점 자동 차단" + "Release 시 정렬 강제" — 두 단계 게이트.
   </div>
 </section>
 
@@ -352,19 +366,19 @@ flowchart LR
   <table>
     <thead><tr><th>#</th><th>저장소</th><th>입력 (read)</th><th>출력 (write)</th><th>검증 게이트</th></tr></thead>
     <tbody>
-      <tr><td>A</td><td>Doc Repo</td><td>RTL Repo의 *.sv (fetch) + DLD §5</td><td>*.ipxact.xml</td><td>D1 / D2</td></tr>
-      <tr><td>B</td><td>Doc Repo</td><td>*.ipxact.xml</td><td><code>include/&lt;ip&gt;_hal.h</code> (auto-gen)</td><td>D3</td></tr>
-      <tr><td>C</td><td>FW Repo</td><td>HAL.h + Guide §6 (submodule)</td><td><code>fw/hal/*_hal.c</code></td><td>F1 + host smoke</td></tr>
-      <tr><td>D</td><td>FW Repo</td><td>Guide §6, §8 (submodule)</td><td><code>tests/scenarios/*.py</code> (Python coverif)</td><td>F2 / F3</td></tr>
+      <tr><td>A</td><td>Doc Repo</td><td>RTL *.sv (fetch) + DLD §5</td><td><code>&lt;ip&gt;.rdl</code> (SystemRDL) 또는 *.ipxact.xml</td><td>D1 / D2</td></tr>
+      <tr><td>B</td><td>Doc Repo</td><td>RDL/XACT</td><td><code>include/&lt;ip&gt;_hal.h</code> (peakrdl auto-gen)</td><td>D3</td></tr>
+      <tr><td>C</td><td><strong>FW Repo</strong></td><td>HAL.h + Guide §6 (submodule)</td><td><code>fw/hal/*_hal.c</code></td><td>F1 + host smoke</td></tr>
+      <tr><td>D</td><td><strong>Test Repo</strong></td><td>Guide §6, §8 (submodule)</td><td><code>tests/scenarios/*.py</code> (SSD Host용)</td><td>T1 / T2</td></tr>
     </tbody>
   </table>
   <div class="cols-2" style="margin-top:18px">
     <div class="card">
       <h4>✅ AI가 자동 생성</h4>
       <ul>
-        <li>IP-XACT XML, HAL.h (Doc Repo)</li>
+        <li>SystemRDL·IP-XACT·HAL.h (Doc Repo)</li>
         <li>HAL.c 초안 (FW Repo)</li>
-        <li><strong>Python coverif scenarios</strong> (FW Repo)</li>
+        <li><strong>Python coverif scenarios (Test Repo)</strong></li>
       </ul>
     </div>
     <div class="card">
@@ -373,7 +387,8 @@ flowchart LR
         <li>RTL Repo의 <code>*.sv</code> — 의도가 농축됨</li>
         <li>DLD §1–4 (설계 의도)</li>
         <li>Programmer's Guide (저자=SW lead)</li>
-        <li>Python scenario의 측정·assertion 의도 (DV 리뷰)</li>
+        <li>FW 측 ISR/락/DMA 정책 (FW lead 리뷰)</li>
+        <li>Test 측 측정·assertion·플랫폼 매핑 (DV 리뷰)</li>
       </ul>
     </div>
   </div>
@@ -429,51 +444,55 @@ flowchart LR
   </div>
 </section>
 
-<!-- ─────────────────── 14. End-to-End 워크플로우 (3-repo) ─────────────────── -->
+<!-- ─────────────────── 14. End-to-End 워크플로우 (4-repo) ─────────────────── -->
 <section class="slide">
   <div class="kicker">End-to-End 워크플로우</div>
-  <h2>3개 저장소 × 부서별 swim lane</h2>
+  <h2>4개 저장소 × 부서별 swim lane</h2>
   <div class="mermaid">
 flowchart LR
     subgraph RTLR["① RTL Repo"]
-      H1["HW: RTL 변경<br/>(*.sv)"]
-      H2["lint + smoke synth<br/>tag (rtl-v*)"]
+      H1["HW: RTL 변경"]
+      H2["tag (rtl-v*)"]
     end
     subgraph DOCR["② Doc Repo"]
-      H3["HW: DLD §5 갱신"]
-      A1["AI: IP-XACT + HAL.h"]
-      S1["SW: Guide §6 worked example"]
+      H3["HW: DLD §5"]
+      A1["AI: SystemRDL · HAL.h"]
+      S1["SW: Guide §6"]
       DC["Doc CI: D1–D5<br/>tag (doc-v*)"]
     end
     subgraph FWR["③ FW Repo"]
-      FS["submodule update<br/>(doc-v* pin)"]
-      A2["AI: HAL.c + Python scenario"]
-      F1["FW: ISR/DMA/락 보강"]
-      D1["DV: 측정·assertion 보강"]
-      FC["FW CI: F1–F5<br/>tag (fw-v*)"]
+      FS["doc/ submodule update"]
+      A2["AI: HAL.c"]
+      F1["FW: ISR / DMA"]
+      FC["FW CI: F1–F3<br/>tag (fw-v*)"]
     end
-    subgraph HW_PLATFORM["검증 플랫폼 (HW/SW coverif)"]
-      FPGA[FPGA]
-      EMU["Veloce / Zebu"]
+    subgraph TR["④ Test Repo"]
+      TS["doc/ submodule update"]
+      A3["AI: Python scenarios"]
+      D1["DV: 측정·assertion"]
+      TC["Test CI: T1–T4<br/>tag (test-v*)"]
+    end
+    subgraph ENV["검증 환경"]
+      HOST["💻 SSD Host<br/>(NVMe / PCIe)"]
+      PLAT["🔧 FPGA · Veloce · Zebu<br/>(SoC + FW)"]
     end
     H1 --> H2 --> H3 --> A1 --> S1 --> DC
     DC -. submodule pin .-> FS
-    FS --> A2 --> F1 --> D1 --> FC
-    H2 -. bitstream / image .-> FPGA
-    H2 -. bitstream / image .-> EMU
-    FC -. FW binary load .-> FPGA
-    FC -. FW binary load .-> EMU
-    D1 -. Python이 FW 구동 .-> FPGA
-    D1 -. Python이 FW 구동 .-> EMU
-    FPGA -. coverage gap .-> H1
-    EMU  -. coverage gap .-> H1
+    DC -. submodule pin .-> TS
+    FS --> A2 --> F1 --> FC
+    TS --> A3 --> D1 --> TC
+    H2 -. bitstream / image .-> PLAT
+    FC -. FW binary load .-> PLAT
+    TC -. Python on SSD Host .-> HOST
+    HOST ==>|NVMe / PCIe| PLAT
+    PLAT -. coverage gap .-> H1
   </div>
-  <p class="lead">검증의 마지막 페이지는 <strong>FPGA + Veloce / Zebu</strong> 위에서 <strong>펌웨어가 실제 시나리오를 수행</strong>한다.</p>
-  <div class="foot">SLIDE 14 — 3-repo E2E</div>
+  <p class="lead">검증의 마지막 페이지는 두 군데에서 동시에: <strong>FPGA·Veloce·Zebu</strong> 위에서 펌웨어 실행, <strong>SSD Host</strong>의 Python이 NVMe/PCIe로 구동.</p>
+  <div class="foot">SLIDE 14 — 4-repo E2E + SSD Host</div>
   <div class="notes">
-    3개 저장소가 swim lane으로. Doc Repo가 가운데에서 SW-HW 계약을 만들고, FW Repo가 submodule pin으로 핀하여 소비.
-    검증 플랫폼은 FPGA + Veloce/Zebu. Python scenarios가 펌웨어를 구동.
-    "rtl-v* × doc-v* × fw-v*" 세 tag로 어느 조합인지 항상 한 줄로 확정.
+    4개 저장소가 swim lane으로. Doc Repo가 가운데에서 SW-HW 계약을 만들고, FW Repo와 Test Repo가 각자 같은 doc-tag로 핀.
+    검증 환경 두 면 — 펌웨어는 FPGA/Veloce/Zebu, Python은 SSD Host. 둘이 NVMe/PCIe로 연결되어 실제 SSD 환경과 동일.
+    "rtl-v* × doc-v* × fw-v* × test-v*" 4-tuple로 측정 조합 확정.
   </div>
 </section>
 
@@ -574,29 +593,32 @@ flowchart LR
 <!-- ─────────────────── 19. 로드맵 ─────────────────── -->
 <section class="slide">
   <div class="kicker">로드맵</div>
-  <h2>12개월 — 3개 lane 점진적 마이그레이션</h2>
+  <h2>12개월 — M0 포맷 마이그레이션 + 4-repo 점진 적용</h2>
   <div class="mermaid">
 gantt
     dateFormat YYYY-MM
     axisFormat %m/%y
     title  M0–M5 마일스톤 (12개월)
-    section M1 Lane A
-    Reference IP 표준화       :done, m1a, 2026-06, 1M
-    CI 6 invariant PR-required :crit, m1b, 2026-06, 1M
+    section M0 포맷 마이그레이션 (prereq)
+    Word→Markdown 파이프라인        :crit, m0a, 2026-06, 1M
+    Excel→SystemRDL 변환 스크립트   :crit, m0b, 2026-06, 2M
+    Ref IP 2종 변환                 :m0c, 2026-07, 1M
+    section M1 4-repo 인프라
+    RTL/Doc/FW/Test 셋업            :m1a, 2026-07, 1M
+    D/F/T CI + Release gate         :crit, m1b, 2026-08, 2M
     section M2 AI 도구
-    Guide → HAL 1-shot          :m2a, 2026-07, 2M
-    프롬프트 표준화              :m2b, 2026-09, 1M
-    section M3 Lane B
-    Top-5 IP 변환                :crit, m3a, 2026-08, 3M
-    Next-10 IP                  :m3b, 2026-11, 4M
-    잔여 활성 IP                 :m3c, 2027-02, 3M
+    Guide → HAL.c (FW)              :m2a, 2026-08, 2M
+    Guide → Python (Test)           :m2b, 2026-09, 2M
+    section M3 Lane B (활성 IP)
+    Top-5 IP 변환                   :crit, m3a, 2026-09, 3M
+    Next-10 IP                      :m3b, 2026-12, 4M
+    잔여 활성 IP                    :m3c, 2027-03, 3M
     section M5 신규 SoC
-    파생 SoC PoC                 :crit, m5a, 2026-10, 2M
+    파생 SoC PoC                    :crit, m5a, 2026-11, 2M
   </div>
   <p class="lead">
-    Lane A (신규 IP) — Day 1부터.<br/>
-    Lane B (활성 in-house) — 우선순위 단위로 점진.<br/>
-    Lane C (legacy) — read-only 유지.
+    <strong>M0 prerequisite</strong>: Word HLD/DLD → Markdown · Excel SFR → SystemRDL.<br/>
+    Lane A (신규) Day 1부터 · Lane B (활성) 단계적 · Lane C (legacy) read-only.
   </p>
   <div class="foot">SLIDE 19 — 로드맵</div>
   <div class="notes">

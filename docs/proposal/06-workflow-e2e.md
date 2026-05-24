@@ -1,8 +1,9 @@
 # 6. End-to-End 워크플로우 — Base SoC에서 신규 SoC까지
 
 본 장은 본 제안이 **현장에서 어떻게 흘러가는가**를 신규 SoC 부트스트랩
-시나리오로 보인다. 4개 부서(HW / SW / Co-verif / FW)가 어느 시점에
-어떤 산출물을 주고받는지 swim lane으로 정리한다.
+시나리오로 보인다. 5개 부서(HW / SW / AI / FW / DV)가 4개 저장소
+(RTL · Doc · FW · Test)와 검증 환경(FPGA·Veloce·Zebu + SSD Host)
+사이에서 어떻게 산출물을 주고받는지 swim lane으로 정리한다.
 
 ---
 
@@ -11,61 +12,73 @@
 ```mermaid
 flowchart LR
     subgraph RTLR["① RTL Repo"]
-      HW1["HW: 새 요구사항 RTL 반영<br/>(rtl/*.sv)"]
-      HW2["lint + smoke synth<br/>tag release"]
+      HW1["HW: RTL 변경<br/>(rtl/*.sv)"]
+      HW2["lint + smoke synth<br/>tag (rtl-v*)"]
     end
 
     subgraph DOCR["② Doc Repo"]
-      HW3["HW: DLD §5 업데이트<br/>(register map 의도)"]
-      AI1["AI: IP-XACT 갱신<br/>HAL .h 자동 생성"]
-      SW1["SW: Programmer's Guide<br/>§6 worked example 작성"]
-      DC1["Doc CI: D1–D5 invariant<br/>+ tag release"]
+      HW3["HW: DLD §5 갱신"]
+      AI1["AI: SystemRDL / IP-XACT<br/>+ HAL.h auto-gen"]
+      SW1["SW: Guide §6 worked example"]
+      DC1["Doc CI: D1–D5<br/>tag (doc-v*)"]
     end
 
     subgraph FWR["③ FW Repo"]
-      FWS["FW: doc/ submodule<br/>새 tag로 update"]
-      AI2["AI: HAL .c 재생성<br/>Python scenario stub"]
+      FWS["doc/ submodule update"]
+      AI2["AI: HAL.c 재생성"]
       FW1["FW: ISR / DMA / 락 보강"]
-      DV1["DV: Python scenario<br/>측정·assertion 보강"]
-      FC1["FW CI: F1–F5 invariant<br/>+ host smoke"]
+      FC1["FW CI: F1–F3 + smoke<br/>tag (fw-v*)"]
     end
 
-    subgraph HW_PLATFORM["검증 플랫폼 (HW/SW coverif)"]
-      FPGA["FPGA"]
-      EMU["Veloce / Zebu"]
+    subgraph TR["④ Test Repo"]
+      TS["doc/ submodule update"]
+      AI3["AI: Python scenarios<br/>(§6 / §8 변환)"]
+      DV1["DV: 측정·assertion 보강"]
+      TC1["Test CI: T1–T4<br/>tag (test-v*)"]
+    end
+
+    subgraph ENV["검증 환경"]
+      HOST["💻 SSD Host<br/>(NVMe / PCIe driver)"]
+      PLAT["🔧 FPGA · Veloce · Zebu<br/>(SoC + FW)"]
     end
 
     HW1 --> HW2 --> HW3 --> AI1 --> SW1 --> DC1
-    DC1 -. "submodule pin<br/>새 tag" .-> FWS
-    FWS --> AI2 --> FW1 --> DV1 --> FC1
-    HW2 -. "bitstream / image" .-> FPGA
-    HW2 -. "bitstream / image" .-> EMU
-    FC1 -. "FW binary load" .-> FPGA
-    FC1 -. "FW binary load" .-> EMU
-    DV1 -. "Python scenarios가<br/>FW를 구동" .-> FPGA
-    DV1 -. "Python scenarios가<br/>FW를 구동" .-> EMU
-    FPGA -. "coverage gap" .-> HW1
-    EMU  -. "coverage gap" .-> HW1
+    DC1 -. submodule pin .-> FWS
+    DC1 -. submodule pin .-> TS
+    FWS --> AI2 --> FW1 --> FC1
+    TS  --> AI3 --> DV1 --> TC1
+    HW2 -. bitstream / image .-> PLAT
+    FC1 -. FW binary load .-> PLAT
+    TC1 -. Python on SSD Host .-> HOST
+    HOST ==>|"NVMe / PCIe<br/>명령"| PLAT
+    PLAT -. coverage gap .-> HW1
 ```
 
 핵심: **AI는 "정합성 잡일"을 흡수**하고, 사람은 "**의도 정의**" (HW의 RTL,
 SW의 가이드, FW의 ISR/락, DV의 측정·assertion)에 집중한다. 검증의 마지막
-페이지는 **FPGA + Veloce/Zebu 위에서 펌웨어가 실제 시나리오를 수행**하는
-HW/SW coverif이다.
+페이지는 두 군데에서 동시에: **FPGA·Veloce·Zebu** 위에서 펌웨어가 실행되고,
+**SSD Host**의 Python이 NVMe/PCIe로 그 펌웨어를 구동·관찰한다 — 실제
+SSD 동작 환경과 동일하다.
 
 ---
 
 ## 6.2 8단계 워크플로우 (구체적 명령 포함)
 
-### Step 1 — Base 선정 (RTL Repo · Doc Repo · FW Repo 세 갈래)
+### Step 1 — Base 선정 (RTL · Doc · FW · Test 네 갈래)
 - HW lead가 가장 유사한 in-house Base SoC를 선정.
 - 변경이 필요한 IP가 속한 **RTL Repo branch**를 cut.
 - **Doc Repo**는 그대로 유지 (해당 IP의 doc 영역만 수정 예정).
-- **FW Repo**는 fork 또는 새 branch — Doc Repo의 현재 tag를 submodule pin.
+- **FW Repo와 Test Repo는 각각 fork 또는 새 branch** — 둘 다 Doc Repo의 현재 tag를 submodule pin.
   ```bash
+  # FW 측
   cd fw-repo && git checkout -b derivative/new-soc
   git submodule update --init --remote doc/
-  git -C doc/ checkout v2.4.0   # base doc tag
+  git -C doc/ checkout doc-v2.4.0   # base doc tag
+
+  # Test 측 (별도 저장소)
+  cd test-repo && git checkout -b derivative/new-soc
+  git submodule update --init --remote doc/
+  git -C doc/ checkout doc-v2.4.0   # 같은 doc tag로 정렬
   ```
 
 ### Step 2 — RTL Repo: 새 요구사항 반영
@@ -80,37 +93,45 @@ HW/SW coverif이다.
 - SW lead가 `doc/nvme_ctrl/PROGRAMMERS_GUIDE.md §6`에 새 worked example 추가.
 - Doc Repo CI green → tag (e.g. `doc-v2.5.0`).
 
-### Step 4 — FW Repo: submodule 갱신 + AI 자동 생성
+### Step 4a — FW Repo: submodule 갱신 + HAL.c 재생성
 ```bash
 cd fw-repo
-git submodule update --remote doc/           # 새 doc tag로 이동
+git submodule update --remote doc/
 git -C doc/ checkout doc-v2.5.0
-ai update-hal-and-scenarios nvme_ctrl        # AI가 시나리오 C, D 실행
+ai update-hal nvme_ctrl                      # AI 시나리오 C
 ```
-다음을 갱신한다:
 - `fw/hal/nvme_ctrl_hal.c` — HAL 함수 본문 (Guide §6 시퀀스를 1:1 변환)
-- `tests/scenarios/nvme_ctrl/sc_admin_queue_enable.py` — Python coverif 시나리오
+
+### Step 4b — Test Repo: submodule 갱신 + Python scenarios 생성
+```bash
+cd test-repo
+git submodule update --remote doc/
+git -C doc/ checkout doc-v2.5.0              # FW와 동일 doc tag (release gate가 강제)
+ai generate-scenarios nvme_ctrl              # AI 시나리오 D
+```
+- `tests/scenarios/nvme_ctrl/sc_admin_queue_enable.py` — SSD Host용 Python
 - `tests/scenarios/nvme_ctrl/regress_*.py` — Guide §8 pitfall 회귀
 
 ### Step 5 — FW: ISR / DMA / 락 보강
 - AI가 만든 HAL을 FW lead가 review.
 - 환경별 ISR 등록·락·DMA 정책 등 사람 영역 보강.
-- `make test` host smoke pass 확인 (F5).
+- `make test` host smoke pass 확인 (F3).
 
-### Step 6 — DV: Python 시나리오 보강 (corner case · 측정)
+### Step 6 — DV: Python scenario 보강 (corner case · 측정)
 - AI가 만든 시나리오에 측정 metric (latency·error 카운트·전력)과 corner case 추가.
 - pre/post assertion 강화.
-- F2, F3 invariant 통과 확인.
+- T1, T2 invariant 통과 확인.
 
-### Step 7 — FW Repo CI: F1–F5 + 시뮬레이션 게이트
-- PR 시점 자동 실행: F1–F5 invariant + host smoke (Verilator IP-level smoke가 있다면 같이 실행).
-- 모두 pass면 merge → tag (e.g. `fw-v1.7.0`).
+### Step 7 — FW · Test 각자 CI 통과 → tag
+- FW Repo CI: F1–F3 + host smoke → `fw-v1.7.0`
+- Test Repo CI: T1–T4 + pytest collect → `test-v0.9.3`
+- Release gate (별도 CI 또는 사인오프): **`FW.doc-SHA == Test.doc-SHA`** 확인 (R1)
 
-### Step 8 — FPGA / Veloce / Zebu에서 HW/SW coverif 실행
+### Step 8 — 검증 환경에서 HW/SW coverif 실행
 - RTL Repo `rtl-v3.2.0`이 합성/에뮬레이션되어 **FPGA bitstream** 또는 **Veloce/Zebu image**가 준비됨 (별도 빌드 인프라).
-- FW Repo `fw-v1.7.0`이 빌드된 binary를 그 플랫폼에 로드.
-- DV가 `tests/scenarios/nvme_ctrl/*.py`를 nightly + regression suite로 실행.
-- 결과(metric·assertion·coverage)가 dashboard로 수집.
+- FW Repo `fw-v1.7.0`의 binary가 그 플랫폼에 **load되어 실행**.
+- DV가 **SSD Host**에서 Test Repo `test-v0.9.3`의 `tests/scenarios/nvme_ctrl/*.py`를 nightly + regression suite로 실행.
+- Python이 NVMe/PCIe로 SoC를 구동, 결과(metric·assertion·coverage)가 dashboard로 수집.
 - coverage gap → Step 2로 되돌아감 (RTL 또는 scenario 추가).
 
 ---
@@ -120,17 +141,19 @@ ai update-hal-and-scenarios nvme_ctrl        # AI가 시나리오 C, D 실행
 | 인계 시점 | 인계자 → 수신자 | 산출물 / 매개 |
 |---|---|---|
 | Step 2 종료 | HW → Doc Repo CI | RTL Repo의 새 tag (`rtl-v*`) |
-| Step 3 종료 | HW + SW + AI → Doc Repo CI | DLD §5 · IP-XACT · HAL.h · Guide §6, §8 |
-| Step 3 → Step 4 | Doc Repo → FW Repo | `doc-v*` tag (submodule pin) |
-| Step 4 종료 | AI → FW · DV | HAL.c 초안, Python scenario 초안 |
-| Step 5 종료 | FW → DV | 검증된 HAL.c + host smoke |
-| Step 6 종료 | DV → FW Repo CI | 보강된 Python scenarios |
-| Step 7 종료 | FW Repo CI → 검증 플랫폼 | `fw-v*` tag · FW binary |
-| Step 8 결과 | 검증 플랫폼 → 전체 | metric / assertion / coverage 대시보드 |
+| Step 3 종료 | HW + SW + AI → Doc Repo CI | DLD §5 · SystemRDL/IP-XACT · HAL.h · Guide §6, §8 |
+| Step 3 → Step 4 | Doc Repo → FW Repo · Test Repo (동시) | `doc-v*` tag (양쪽 모두 같은 SHA로 핀) |
+| Step 4a 종료 | AI → FW lead | HAL.c 초안 |
+| Step 4b 종료 | AI → DV | Python scenario 초안 (SSD Host용) |
+| Step 5 종료 | FW → FW Repo CI | 검증된 HAL.c + host smoke |
+| Step 6 종료 | DV → Test Repo CI | 보강된 Python scenarios |
+| Step 7 종료 | FW + Test Repo CI → Release gate | `fw-v*` · `test-v*` tag, **R1 (doc-SHA 정합) 통과** |
+| Step 8 결과 | 검증 환경 (FPGA·Veloce·Zebu + SSD Host) → 전체 | metric · assertion · coverage 대시보드 |
 
 각 인계는 **모두 git tag / submodule SHA**로 일어난다. Slack DM·메일
-첨부·Confluence 페이지 없음. "어느 RTL × 어느 doc × 어느 FW로 측정했나"
-가 항상 한 줄로 확정된다 — `rtl-v3.2.0 × doc-v2.5.0 × fw-v1.7.0`.
+첨부·Confluence 페이지 없음. "**어느 RTL × 어느 doc × 어느 FW × 어느
+Test 조합으로 측정했나**"가 항상 한 줄로 확정된다 — `rtl-v3.2.0 ×
+doc-v2.5.0 × fw-v1.7.0 × test-v0.9.3`.
 
 ---
 
@@ -155,12 +178,13 @@ well-defined task에서 20–45% 생산성 향상을 보이며, 본 워크플로
 
 | 시나리오 | 대처 |
 |---|---|
-| RTL 변경 후 가이드/IP-XACT 미갱신 | Doc Repo D1·D2 fail → Doc PR 차단 (FW까지 안 감) |
-| AI가 만든 HAL.h에 환각 | Doc D3 fail (IP-XACT ↔ HAL.h) → Doc PR 차단 |
-| FW가 stale doc tag로 머묾 | FW Repo CI가 `doc/` SHA의 monotonic 진행 검사 (F4) — release 시 outdated 경고 |
-| DV가 Python scenario를 Guide에서 빠뜨림 | FW Repo F2 fail → FW PR 차단 |
-| Pitfall 회귀 누락 | F3 fail → FW PR 차단 |
-| FPGA / Emulator에서만 보이는 결함 | coverage gap report → Step 2로 회귀 (RTL 또는 scenario 추가) |
+| RTL 변경 후 가이드/SFR 미갱신 | Doc Repo D1·D2 fail → Doc PR 차단 (FW/Test까지 안 감) |
+| AI가 만든 HAL.h에 환각 | Doc D3 fail (SFR ↔ HAL.h) → Doc PR 차단 |
+| FW가 stale doc tag로 머묾 | F2 fail (FW Repo `doc/` SHA monotonic 위반) |
+| FW와 Test가 다른 doc tag를 봄 | **Release gate R1 fail** — release 차단 |
+| DV가 Python scenario를 Guide에서 빠뜨림 | Test Repo T1 fail → Test PR 차단 |
+| Pitfall 회귀 누락 | T2 fail → Test PR 차단 |
+| FPGA / Veloce / Zebu 에서만 보이는 결함 | coverage gap report → Step 2로 회귀 (RTL 또는 scenario 추가) |
 
 이 모든 대처는 사람의 성실성이 아니라 **CI 또는 git의 native 기능**에
 의존한다.

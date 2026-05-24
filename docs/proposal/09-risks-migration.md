@@ -9,38 +9,64 @@
 
 | # | 리스크 | 영향 | 완화책 |
 |---|---|---|---|
-| R1 | FW Repo의 `git submodule` 학습 곡선 | FW/SW 엔지니어가 익숙하지 않음 | `make doc-update` · `make doc-pin <tag>` 한 줄 wrapper. 일반 사용자는 submodule 명령 직접 입력 안 함 |
+| R0 | **현재 산출물 포맷 마이그레이션** — HLD/DLD가 Word, SFR이 Excel | 본 제안 채택 전 변환 필요 | **Phase 0 (M0)**: Pandoc으로 Word→Markdown, Excel→SystemRDL 자동 변환 스크립트. 사람이 만지는 페이지를 표 제목·헤딩 보정 정도로 제한. 9.3 §에서 상세 |
+| R1 | FW/Test Repo의 `git submodule` 학습 곡선 | FW/DV 엔지니어가 익숙하지 않음 | 양쪽 저장소의 `make doc-update` · `make doc-pin <tag>` 한 줄 wrapper. 일반 사용자는 submodule 명령 직접 입력 안 함 |
 | R2 | 대용량 binary / waveform / FPGA bitstream | git에 두기 무거움 | git LFS 또는 별도 artifact bucket (S3). RTL/문서/HAL/Python은 git, bitstream/wave는 별도 |
-| R3 | Doc submodule 핀이 detached HEAD로 떠도는 위험 | FW가 임의 commit을 가리킬 가능성 | FW Repo CI의 F4 invariant — submodule SHA가 Doc Repo의 release tag와 일치하는지 강제 |
-| R4 | Cross-repo coordination latency | RTL 변경이 FW까지 가는 데 Doc Repo PR 한 번이 끼임 | nightly batch도 가능. Critical 변경은 RTL → Doc → FW가 같은 day-cycle 안에 흐를 수 있도록 SLA 정의 |
-| R5 | AI 자동 생성 환각 (HAL.c, Python scenario) | 잘못된 HAL 매크로/시나리오 | Doc Repo / FW Repo CI invariant가 PR 시점에 차단. AI 출력 신뢰는 CI가 검증 |
-| R6 | IP-XACT 작성 부담 | XML 직접 편집은 비친화적 | AI 자동 생성 (시나리오 A, §5) + spreadsheet → XML 변환기 보조 |
-| R7 | FPGA / Veloce / Zebu 가용성 병목 | Python scenario 실행이 큐에 적체 | nightly 회귀 + 변경 영향분석 기반 우선순위. host smoke와 IP-level Verilator smoke를 PR 게이트에 두고, full coverif는 비동기 |
-| R8 | 조직 변화 저항 | "지금까지 Confluence로 잘 해왔다" | 신규 IP부터 우선 적용. Confluence 기존 자산은 일정 기간 read-only로 병행 |
+| R3 | Doc submodule 핀이 detached HEAD로 떠도는 위험 | FW/Test가 임의 commit을 가리킬 가능성 | FW Repo F2, Test Repo T3 invariant — submodule SHA가 Doc Repo의 release tag와 일치하는지 강제 |
+| R4 | **FW와 Test의 doc 정렬 어긋남** | "FW는 doc v2.5, Test는 doc v2.4로 검증" 같은 미세 분기로 결과 해석 불가 | Release gate R1 — `FW.doc-SHA == Test.doc-SHA` 자동 강제 (§4.2.4) |
+| R5 | AI 자동 생성 환각 (HAL.c, Python scenario) | 잘못된 HAL/시나리오 | Doc / FW / Test 각 CI invariant가 PR 시점에 차단. AI 출력 신뢰는 CI가 검증 |
+| R6 | SystemRDL/IP-XACT 작성 부담 | XML 직접 편집은 비친화적 | **SystemRDL `.rdl`을 author format으로**, peakrdl이 XML/HAL.h/Markdown 일괄 emit (§2.2 (3)). AI 자동 생성 (시나리오 A, §5) 병행 |
+| R7 | FPGA / Veloce / Zebu 가용성 병목 | Python scenario 실행이 큐에 적체 | nightly 회귀 + 변경 영향분석 기반 우선순위. Host smoke + Test Repo pytest collect는 PR 게이트에 두고, 실측 coverif는 비동기 |
+| R8 | Cross-repo coordination latency | RTL 변경이 검증까지 가는 데 Doc·FW·Test 3개 PR이 끼임 | Critical path SLA: RTL → Doc (D당), Doc → {FW,Test} (D+1) 정의. 비-critical은 nightly batch |
+| R9 | 조직 변화 저항 | "지금까지 Word/Excel로 잘 해왔다" | Phase 0 자동 변환으로 진입장벽 최소화. 신규 IP부터 우선 적용. 기존 자산은 일정 기간 read-only 병행 |
 
 ---
 
 ## 9.2 마이그레이션 전략 — Risk-tiered 3-Lane
 
 기존 환경의 인공물을 한 번에 옮기지 않고, 다음 3 lane으로 점진적
-이행한다:
+이행한다. (Phase 0의 포맷 변환은 9.3에서 별도 다룸 — 모든 lane의 prerequisite)
 
 ### Lane A — 신규 IP/SoC (Day 1부터 본 제안)
-- 모든 신규 IP는 본 워크플로우의 9-stage 산출물 구조를 따른다.
+- 모든 신규 IP는 본 워크플로우의 4-repo 산출물 구조를 따른다.
 - Reference IP (`irq_ctrl`, `trng`) 템플릿에서 시작.
-- CI invariant 6종을 PR Required Status Check로 강제.
+- Doc D1–D5 + FW F1–F3 + Test T1–T4 + Release R1 invariant를 PR Required Status Check로 강제.
 - **이 lane은 비용이 가장 낮고 효과가 가장 빠르다**.
 
 ### Lane B — 활발히 수정되는 in-house IP (점진적)
 - IP 단위로 우선순위를 정해 마이그레이션.
-- 우선순위는 ① RTL 수정 빈도 ② SoC 파생 사용 빈도 ③ SW 팀 의존도.
-- 1 IP당 평균 1–2주 (스켈레톤 변환 + 가이드 작성 + invariant 통과까지).
+- 우선순위는 ① RTL 수정 빈도 ② SoC 파생 사용 빈도 ③ FW 팀 의존도.
+- 1 IP당 평균 1–2주 (Word→MD + Excel→SystemRDL 변환 + 가이드 작성 + invariant 통과).
 
 ### Lane C — 안정화된 legacy IP (read-only 유지)
 - 더 이상 수정되지 않는 legacy IP는 Confluence/SharePoint에 그대로
   read-only 보관.
-- super-repo에서는 "legacy 참조 링크"만 둠.
+- Doc Repo에는 "legacy 참조 링크"만 둠.
 - 새 SoC가 이 IP를 사용하려면 lane B로 승급 (그 시점에만 변환 비용).
+
+## 9.3 Phase 0 — 현재 포맷 마이그레이션 (Word/Excel → MD/SystemRDL)
+
+본 제안 채택의 **prerequisite**이며, 자동 변환을 우선한다.
+
+### 9.3.1 HLD/DLD: Word(`.docx`) → Markdown
+- **자동 변환**: `pandoc -f docx -t gfm <file>.docx > <file>.md`
+- **수동 보정**: 표 헤더, 헤딩 번호, 이미지 경로, Mermaid로 다시 그려야 할 다이어그램 (Visio/PowerPoint 다이어그램은 별도 작업)
+- **소요**: 1 IP당 0.5–1일 (200페이지 미만의 일반적 IP 기준)
+- **검수**: Doc Repo D1 (RTL ↔ DLD §5) invariant가 register map 정합성을 한 번에 잡아냄
+
+### 9.3.2 SFR: Excel → SystemRDL (`.rdl`) 또는 IP-XACT XML
+- **권장 경로**: Excel → **SystemRDL `.rdl`** (사람·AI 양쪽이 읽기 쉬움) → peakrdl이 IP-XACT XML / HAL.h / Markdown 표 일괄 emit
+- **자동 변환**: 사내 Excel template이 정형화되어 있으면 Python 1회성 스크립트로 RDL 생성 가능. 컬럼 매핑 (offset / width / access / reset / desc)이 표준이면 1 IP당 분 단위
+- **변환기 도구**:
+  - `openpyxl` + 자체 emitter (가장 흔한 경로)
+  - `peakrdl-python` (RDL → Python 모델)
+  - 상용: SystemRDL-import 기능 제공 EDA 도구
+- **소요**: 사내 Excel 포맷 표준화에 1–2주, 그 후 IP당 분 단위 변환
+- **검수**: Doc Repo D2 (DLD §5 ↔ SFR), D3 (SFR ↔ HAL.h) invariant가 변환 정합성을 자동 검증
+
+### 9.3.3 변환 후의 양방향 호환 (점진적 전환 기간)
+- 변환 초기에는 사람이 Excel을 여전히 편집할 수 있다 — 단, Excel→RDL 자동 변환 step이 PR 단위로 돌고, 변환 결과 RDL이 SoT가 된다.
+- 일정 기간 후 (예: 6개월) Excel 편집을 deprecate하고 RDL을 직접 편집.
 
 ---
 

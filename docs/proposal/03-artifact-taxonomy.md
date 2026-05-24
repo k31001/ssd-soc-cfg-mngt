@@ -13,20 +13,27 @@ SoC 도메인을 매핑하면 5종이 자연스럽게 도출된다.
 | 1 | **HLD** (High Level Description) | Markdown + Mermaid | IP architect | IP의 목적·블록 구조·외부 인터페이스의 **개념적 설명** | Doc Repo |
 | 2 | **DLD** (Detailed Level Description, 일명 DESIGN.md) | Markdown + Mermaid + WaveDrom | RTL designer | RTL의 구현 디테일 — FSM·timing·port table·register map | Doc Repo |
 | 3 | **Programmer's Guide** | Markdown | SW lead (저자) + RTL designer (리뷰) | SW 개발자가 "이 IP를 어떻게 쓰는가"를 익히는 **How-to** + **worked examples** | Doc Repo |
-| 4 | **SFR (IP-XACT)** | XML (IEEE 1685-2022) | RTL designer | Register/field-level 기계 판독 가능 **reference** | Doc Repo |
+| 4 | **SFR** (SystemRDL `.rdl` author + IP-XACT XML interchange) | SystemRDL 2.0 + IEEE 1685-2022 XML | RTL designer | Register/field-level **기계 판독 가능 reference** — `peakrdl-*`로 XML / HAL.h / Markdown 일괄 emit | Doc Repo |
 | 5 | **HAL API 헤더** | C 헤더 (`<ip>_hal.h`) + Doxygen 주석 | RTL designer / 자동 생성 | 함수 시그너처·전제조건·반환값의 **reference** (SW-HW 계약) | Doc Repo (auto-gen) |
 
-위 5종은 모두 **Doc Repo가 단일 출처**이며, FW Repo가 `doc/` submodule로 소비한다. FW Repo는 그 위에 다음의 "검증·실행 산출물"을 얹는다:
+위 5종은 모두 **Doc Repo가 단일 출처**이며, **FW Repo와 Test Repo가 각자
+`doc/` submodule로 소비**한다. 두 저장소는 그 위에 자기 영역의 산출물을 얹는다:
 
-| 산출물 | 포맷 | 책임자 | 1줄 정의 | 사는 저장소 |
-|---|---|---|---|---|
-| HAL `.c` 구현 | C source | SW / FW engineer | HAL.h 시그너처에 대한 펌웨어 구현 | FW Repo |
-| **Python coverif scenarios** | Python (`tests/scenarios/*.py`) | DV / FW | Guide §6 worked example·§8 pitfall을 FPGA/Veloce/Zebu에서 실측 가능한 시퀀스로 변환 | FW Repo |
-| Driver / App firmware | C source | FW engineer | SSD Controller 기능 펌웨어 (NVMe, FTL 등) | FW Repo |
-| Host smoke / 단위 테스트 | Python / C | FW + DV | HAL.c 단위 검증 | FW Repo |
+| 산출물 | 포맷 | 책임자 | 1줄 정의 | 사는 저장소 | 실행 위치 |
+|---|---|---|---|---|---|
+| HAL `.c` 구현 | C source | FW engineer | HAL.h 시그너처에 대한 펌웨어 구현 | **FW Repo** | FPGA · Veloce · Zebu |
+| Driver / App firmware | C source | FW engineer | SSD Controller 기능 펌웨어 (NVMe, FTL 등) | **FW Repo** | FPGA · Veloce · Zebu |
+| Host smoke / 단위 테스트 | Python / C | FW | HAL.c 단위 검증 (시뮬레이션 없음) | **FW Repo** | CI runner |
+| **Python coverif scenarios** | Python (`tests/scenarios/*.py`) | DV / Validation | Guide §6 worked example·§8 pitfall을 NVMe/PCIe 시퀀스로 변환 | **Test Repo** | **SSD Host (Linux 서버)** |
+| Host helper · NVMe driver wrapper | Python | DV | 검증 플랫폼·NVMe 추상 (FPGA · Veloce · Zebu 백엔드 공통) | **Test Repo** | **SSD Host** |
 
-이 8개의 산출물이 **3개 저장소 안에 명확히 위치**한다. AI가 컨텍스트를
+이 9개의 산출물이 **4개 저장소 안에 명확히 위치**한다. AI가 컨텍스트를
 구성할 때 어느 파일을 읽어야 할지에 모호함이 없다.
+
+> **왜 FW 산출물과 Test 산출물이 다른 저장소인가** — FW는 SoC 위에서 도는
+> 코드(C 임베디드 빌드)이고, Test는 Host에서 SoC를 구동하는 Python이다.
+> 책임 부서 · 언어 · 툴체인 · 릴리스 주기 · 보안 boundary가 모두 다르다.
+> 같은 저장소에 두면 권한 분리가 무너지고 release 주기가 강제로 묶인다.
 
 ---
 
