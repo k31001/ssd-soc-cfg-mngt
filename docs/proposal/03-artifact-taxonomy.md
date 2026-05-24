@@ -162,6 +162,51 @@ flowchart LR
 이 분해는 "한 문서가 두 가지 청중을 동시에 충족시키려 하면 둘 다
 실패한다"는 Diátaxis의 원칙[^1]에 기반한다.
 
+---
+
+## 3.6 마크다운에서의 시각화 — 흔한 질문에 답하기
+
+> **"산출물을 전부 마크다운으로 옮긴다면, 기존에 Visio·PowerPoint·Word
+> 안에 그리던 블록 다이어그램·플로우차트·UML·웨이브폼은 어떻게 하나?"**
+
+산업 표준 도구셋이 이미 모든 유형을 마크다운 친화적으로 처리한다.
+
+| 시각화 유형 | 권장 도구 | 본 워크플로우에서 |
+|---|---|---|
+| 블록 다이어그램 · 플로우차트 · 시퀀스 · **클래스** · 상태 · ER · Gantt | **Mermaid** | 기본 (GitHub · 본 뷰어 모두 네이티브 렌더). 본 보고서·발표 슬라이드에서 이미 다수 사용 중. |
+| **신호 타이밍 · bitfield** (SoC DLD §6 timing) | **WaveDrom** | SoC 산업 표준 (Stage 3 DLD에서 이미 사용). JSON 소스가 git diff 가능. |
+| 고급 UML (컴포넌트 · 배포 · use-case) | **PlantUML** | [Kroki.io](https://kroki.io/) 게이트웨이 또는 사전 렌더 SVG. PlantUML 1685-2022 IP-XACT의 ipxactExt 영역도 표현 가능. |
+| 복잡한 그래프 · DAG · 데이터 흐름 | **D2 · Graphviz (DOT)** | Kroki 동일 패턴. D2는 자동 레이아웃이 강력. |
+| 자유 스케치 · 사진 · 직접 그리기 | **draw.io · excalidraw → SVG export** | 최후 수단. SVG를 git commit 후 마크다운에서 `![](path.svg)` 인라인. |
+| 수식 | **KaTeX / MathJax** | `$...$` inline 또는 `$$...$$` block. |
+| 차트 (성능·KPI) | **Chart.js · plotly · vega-lite** | 본 보고서의 §8 ROI 차트가 Chart.js 예시. |
+
+### 통합 렌더링 — Kroki.io 단일 게이트웨이
+
+위 도구는 모두 **텍스트(또는 JSON) 소스 → SVG**의 단방향 변환이다.
+[Kroki.io](https://kroki.io/)는 Mermaid · WaveDrom · PlantUML · D2 ·
+BPMN · BlockDiag · Excalidraw 등 **20+종을 한 HTTP 엔드포인트**로 렌더한다.
+사내 self-host도 가능. CI에서 한 단계로 모든 다이어그램을 SVG로 변환할 수 있다.
+
+### 본 발표 슬라이드의 실증
+
+발표 슬라이드 11번 ([▶ web/present/](../../web/present/index.html#11)) 에서
+**Mermaid 클래스 다이어그램** (HAL 구조) 과 **WaveDrom APB write 타이밍**이
+같은 페이지에서 **동시에 라이브 렌더**된다 — 단일 HTML 페이지·단일 마크다운
+스타일 source 안에서. 이 자체가 "마크다운으로 다 가능하다"의 증거이다.
+
+### 모든 경우의 출구
+
+위 도구로도 표현이 어려운 케이스 (예: 칩 사진 위 annotation, 회사 표준 양식의
+승인 도장 영역) 는 다음 출구를 쓴다:
+
+1. 도구 (draw.io / Inkscape / Lucidchart) 에서 SVG export.
+2. SVG를 `doc/<ip>/diagrams/*.svg` 로 git commit.
+3. 마크다운에서 `![설명](diagrams/x.svg)` 1줄로 임베드.
+4. 동시에 source 파일 (`.drawio`, `.svg` 자체)도 commit — 다음에 누구나 편집 가능.
+
+즉 **"어떤 시각화도 마크다운 안에 박지 못한다"는 경우가 없다**.
+
 다음 장(4장)에서 이 5종이 **CI invariant로 어떻게 정합성이 강제되는가**
 를 본 레포의 `tools/ipflow.py` 구현을 들어 설명한다.
 

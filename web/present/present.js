@@ -55,6 +55,24 @@
     }
   }
 
+  // WaveDrom — slide 11 (시각화 종합) 의 timing diagram.
+  // 첫 활성화 시점에 ProcessAll() 한 번 호출. WaveDrom 은 SVG 를 explicit
+  // dimension 으로 만들어 부착하므로 display:none 의 영향을 받지 않는다.
+  let waveDromProcessed = false;
+  function ensureWaveDromRendered(slideIdx) {
+    if (!window.WaveDrom || waveDromProcessed) return;
+    const slide = slides[slideIdx];
+    if (!slide) return;
+    const hasWaveDrom = slide.querySelector('script[type="WaveDrom"]');
+    if (!hasWaveDrom) return;
+    try {
+      window.WaveDrom.ProcessAll();
+      waveDromProcessed = true;
+    } catch (e) {
+      console.error('WaveDrom render failed', e);
+    }
+  }
+
   function show(i, opts = {}) {
     idx = clamp(i);
     slides.forEach((s, j) => s.classList.toggle('active', j === idx));
@@ -69,12 +87,15 @@
     if (window.location.hash !== '#' + (idx + 1)) {
       history.replaceState(null, '', '#' + (idx + 1));
     }
-    // Lazy render mermaid only after the slide is laid out (display:flex 적용 후)
-    requestAnimationFrame(() => ensureMermaidRendered(idx));
+    // Lazy render mermaid · WaveDrom only after the slide is laid out (display:flex 적용 후)
+    requestAnimationFrame(() => {
+      ensureMermaidRendered(idx);
+      ensureWaveDromRendered(idx);
+    });
   }
 
   // Expose for the print handler
-  window.__deck = { ensureMermaidRendered, slides };
+  window.__deck = { ensureMermaidRendered, ensureWaveDromRendered, slides };
 
   function next() {
     const frags = currentFragments();
@@ -177,6 +198,11 @@
         try { await window.mermaid.run({ nodes: Array.from(all) }); }
         catch (e) { console.error('mermaid render (print) failed', e); }
       }
+    }
+    // WaveDrom 도 인쇄 전 모두 처리
+    if (window.WaveDrom && !waveDromProcessed) {
+      try { window.WaveDrom.ProcessAll(); waveDromProcessed = true; }
+      catch (e) { console.error('WaveDrom render (print) failed', e); }
     }
     // 레이아웃 정리 후 인쇄
     setTimeout(() => window.print(), 80);
