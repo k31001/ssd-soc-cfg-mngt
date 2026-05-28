@@ -1,178 +1,222 @@
-# 5. AI 자동화 — Programmer's Guide를 SW-HW 계약으로 두고 HAL을 1-shot 생성
+# 5. AI 자동화 — Claude Code 가 개발자 + 검증자
 
-본 장은 "AI가 SoC 산출물을 자동 생성한다"는 막연한 표어를 **구체적인
-4가지 자동 생성 시나리오**로 분해한다. 그리고 각 시나리오에서 AI에게
-어떤 컨텍스트를 어떻게 (RAG 아닌 직접 read로) 주는지 명시한다.
+본 장은 AI 의 역할을 두 가지로 명확히 한다:
+
+1. **Developer**: Claude Code 가 HAL.c · FW driver/app · Python coverif 를 작성.
+2. **Self-Verifier**: 작성 직후 자기 출력물을 doc invariant 와 비교, PR 전에
+   환각을 차단.
+
+그리고 Claude 가 어디를 참조하는가 — **참조 위계** — 를 구조적으로 정의한다.
 
 ---
 
-## 5.1 AI가 생성하는 4가지 산출물 — 저장소별 분담
+## 5.1 Claude Code 의 작업 범위 (5가지 시나리오)
 
-| # | 실행 저장소 | 입력 (AI가 읽는 것) | 출력 (AI가 쓰는 것) | 검증 게이트 |
+| # | 실행 저장소 | 입력 (Claude 가 read) | 출력 (Claude 가 write) | 검증 게이트 |
 |---|---|---|---|---|
-| A | **Doc Repo** | RTL Repo의 `*.sv` (fetch) + DLD §5 표 초안 | `doc/<ip>/<ip>.rdl` (SystemRDL) 또는 `.ipxact.xml` | D1 / D2 |
-| B | **Doc Repo** | `<ip>.rdl` 또는 `.ipxact.xml` | `include/<ip>_hal.h` (auto-gen via peakrdl/ipxact2c) | D3 |
-| C | **FW Repo** | `doc/include/<ip>_hal.h` (submodule) + `doc/<ip>/PROGRAMMERS_GUIDE.md` (submodule) | `fw/hal/<ip>_hal.c` 구현체 | F1 + host smoke |
-| D | **Test Repo** | `doc/<ip>/PROGRAMMERS_GUIDE.md §6, §8` (submodule) | `tests/scenarios/<ip>/*.py` (SSD Host용 Python coverif) | T1 / T2 |
+| A | **Design Repo** | RTL Repo `*.sv` (fetch) | DLD §5 shadow zone update 보조 + §1-4 초안 | D1 / D2 / D3 (사람 검토) |
+| B | **RDL Repo** | RTL Repo + DLD | `<ip>.rdl` shadow update 보조 + field `desc` 초안 | R1 / R2 (사람 검토) |
+| C | **PG Repo** | Design + RDL (submodule) | §6 worked example 초안 · §8 pitfall 후보 (incident log 추출) | P1–P4 (SW lead 검토) |
+| D | **HAL Repo** | RDL + PG (submodule) | `HAL.c` 본문 (`HAL.h` 는 peakrdl) | H1 / H2 / H3 |
+| E | **FW Repo** | HAL + PG + RDL + Design + Spec (submodule) | driver / app firmware 패치 | F1–F5 + host smoke |
+| F | **Test Repo** | PG + RDL + Design + Spec (submodule) | Python coverif scenario | T1–T5 |
 
 각 시나리오의 공통 특징:
-- **AI는 git 안의 마크다운/RDL/XML/Verilog/Python을 직접 read** 한다 (RAG 없음).
-- **출력은 해당 저장소의 PR**. CI invariant가 정합성을 강제하므로
-  AI 환각은 머지 단계에서 차단된다.
-- **시나리오 A, B는 Doc Repo**가 닫는다 → Doc Repo가 새 tag를 release.
-- **시나리오 C는 FW Repo**가, **시나리오 D는 Test Repo**가 각자 자기 `doc/` submodule을 새 tag로 갱신한 직후 자동 실행.
-- **사람의 역할은 의도 검토** — 즉 "기능이 맞는가"에 집중하고 "이름이
-  맞는가"는 CI가 본다.
+- **Claude 는 git 안의 마크다운 / RDL / XML / PDF-extracted MD / C / Python 을 직접 read** 한다 (RAG·MCP 없음).
+- **PR 전에 Claude 가 자기 출력물을 자체 검증** (§5.3).
+- **CI invariant** 가 최종 신뢰의 관문 — Claude 의 자체 검증이 통과해도 CI 가 다시 본다.
 
 ---
 
-## 5.2 왜 submodule + 직접 read인가 — RAG와의 결정적 차이
+## 5.2 참조 위계 — RTL 직접 참조 금지
 
-### RAG/MCP 방식의 AI 컨텍스트 주입
+FW · Test (그리고 Claude) 가 무엇을 어떤 순서로 보는지 명확한 규칙:
+
 ```
-[질의] "irq_ctrl HAL에 enable 함수 구현 ..."
+┌───────────────────────────────────────────────────┐
+│ Primary (기본)                                     │
+│   • PG (Programmer's Guide)  — SW-HW 계약        │
+│   • RDL (SystemRDL)          — 레지스터 사양     │
+├───────────────────────────────────────────────────┤
+│ Secondary (Primary 가 부족할 때만)                  │
+│   • DLD §1-4 (Design Repo)   — RTL 구현 디테일   │
+├───────────────────────────────────────────────────┤
+│ Background (한 번 읽고 끝)                          │
+│   • HLD                       — IP 개념·블록도    │
+├───────────────────────────────────────────────────┤
+│ Reference (필요 시 grep)                            │
+│   • Spec Repo MD extracts     — NVMe/PCIe/ONFI    │
+├───────────────────────────────────────────────────┤
+│ 🚫 금지                                            │
+│   • RTL Repo (*.sv)           — 절대 직접 참조 X │
+└───────────────────────────────────────────────────┘
+```
+
+### 왜 RTL 직접 참조 금지인가
+- **추상화 경계 보존**. RTL 은 구현의 진실이지만, FW/Test 가 그것을 직접 보면 PG/RDL/DLD 가 부실해도 어떻게든 동작 — 결국 문서가 무용지물이 됨.
+- **문서 부실 신호**. FW/Test 개발자가 "RTL 봐야겠다" 고 느끼는 순간이 곧 **PG/DLD 가 부족하다는 버그 리포트**. RTL 참조 금지가 그 피드백 루프를 강제.
+- **권한 분리 보강**. RTL 은 SW 팀에 노출될 필요가 없는 산출물.
+- **AI 컨텍스트 절약**. Claude 가 `*.sv` 를 일일이 안 봐도 된다.
+
+### 구조적 강제 (§4.2 의 P4 · F3 · T4 invariant)
+- PG Markdown 안에 `*.sv` 직접 링크 → **P4 fail**.
+- FW source 에 RTL header `#include` → **F3 fail** (정적 분석).
+- Test source 에 RTL path 언급 → **T4 fail** (regex/import 검사).
+
+문화·convention 이 아니라 CI 가 강제하는 규칙.
+
+### Claude Code 의 프롬프트 컨벤션
+
+Claude 에게 작업을 시킬 때 시스템 프롬프트에 다음을 포함:
+
+```
+You are working in the FW Repo (or Test Repo) of an 8-repo SoC project.
+
+Reference hierarchy (strict):
+- Primary: doc/pg/<ip>/PROGRAMMERS_GUIDE.md, doc/rdl/<ip>/<ip>.rdl
+- Secondary: doc/design/<ip>/DLD.md §1-4  (only if primary insufficient)
+- Background: doc/design/<ip>/HLD.md  (read once)
+- Reference: doc/spec/extracted/*.md  (grep on demand)
+- FORBIDDEN: any *.sv from RTL Repo (will be blocked by CI; do not attempt)
+
+Workflow:
+1. Read primary refs to understand the SW-HW contract.
+2. Write the patch.
+3. Self-verify against invariants (§5.3) before opening PR.
+```
+
+---
+
+## 5.3 Claude 의 자체 검증 (Pre-PR Self-Check)
+
+Claude 가 코드 작성 직후 PR 을 만들기 전에 다음을 실행:
+
+```
+1. Re-read PG §6 worked example 의 모든 함수 시그너처
+   ↓ 비교
+2. Re-read HAL.h (submodule) 의 export
+   ↓ 일치?
+3. 작성한 HAL.c 의 함수 시그너처
+   ↓ 일치?
+   
+4. (Test Repo 인 경우) PG §6 의 worked example 개수
+   ↓ 일치?
+5. 작성한 sc_*.py 의 scenario 개수
+   
+6. RTL 직접 참조 grep check
+   ↓ 0 건?
+   
+7. Self-report:
+   "12/12 PG §6 worked examples covered, 8/8 §8 pitfalls regression added,
+    0 RTL direct references, HAL.h signature match: OK. Opening PR."
+```
+
+이 자체 검증의 가치:
+- **PR 노이즈 감소** — CI 가 fail 할 PR 을 미리 차단.
+- **Claude 의 환각 일찍 발견** — 잘못 작성하면 자기가 잡음.
+- **사람 리뷰어의 부담 감소** — "기본적인 정합성은 통과한 PR"만 보면 됨.
+
+CI 와의 차이:
+- Claude 의 self-check 는 **신뢰의 1차 필터**. 빠르지만 권위는 없음.
+- CI 는 **신뢰의 마지막 관문**. 느리지만 권위 있음. Claude 의 self-check 결과를 의심해도 됨.
+
+---
+
+## 5.4 컨텍스트 주입의 결정성 — RAG 와의 비교
+
+### RAG/MCP 방식
+```
+[질의] "nvme_ctrl HAL admin queue enable 구현"
    ↓
 [Vector search] top-k 청크 회수 (수십 개)
    ↓
-[LLM context] 무관·중복 청크 다수 + 진짜 필요한 SFR 정보 일부
+[LLM context] 무관·중복 청크 다수
    ↓
-[출력] 환각 위험 (인접 IP의 enable 함수 시그너처와 혼동 가능)
+[출력] 환각 위험
 ```
 
-### 본 제안의 AI 컨텍스트 주입 (FW Repo 시점)
+### 본 제안 (FW Repo 시점)
 ```
-[질의] "nvme_ctrl HAL에 admin queue enable 함수 구현 ..."
+[질의] "nvme_ctrl HAL admin queue enable 구현"
    ↓
-[AI 도구 호출]  Read("doc/nvme_ctrl/PROGRAMMERS_GUIDE.md")   # submodule
-               Read("doc/include/nvme_ctrl_hal.h")           # submodule
-               Read("fw/hal/nvme_ctrl_hal.c")                # 현재 구현
+[Claude 도구]   Read("doc/pg/nvme_ctrl/PROGRAMMERS_GUIDE.md")   # submodule, primary
+              Read("doc/hal/include/nvme_ctrl_hal.h")          # submodule, primary
+              Read("fw/hal/nvme_ctrl_hal.c")                   # 현재 구현
    ↓
-[LLM context] 정확히 3개 파일 — 모두 FW Repo working copy 안
+[LLM context] 정확히 3개 파일 — 모두 working copy
    ↓
-[출력] HAL .c 패치 → FW Repo CI가 F1 + host smoke 로 검증
-```
-
-### 본 제안의 AI 컨텍스트 주입 (Test Repo 시점)
-```
-[질의] "Guide §6.2 admin queue enable worked example 을 Python으로 변환 ..."
-   ↓
-[AI 도구 호출]  Read("doc/nvme_ctrl/PROGRAMMERS_GUIDE.md")   # submodule (§6, §8)
-               Read("tests/lib/nvme_host.py")                # Host NVMe helper
-   ↓
-[LLM context] 2개 파일 — 모두 Test Repo working copy 안
-   ↓
-[출력] tests/scenarios/nvme_ctrl/sc_admin_queue_enable.py
-       → Test Repo CI가 T1 + pytest --collect-only 로 검증
+[출력] HAL.c 패치 → 자체 검증 → FW CI (F1+host smoke) → PR
 ```
 
-submodule pin이 같으면 동일 질의는 항상 같은 컨텍스트를 본다. **FW와
-Test 두 저장소가 자기 doc submodule을 각자 들고 있어** 컨텍스트가
-교차오염되지 않는다. RTL은 참고할 필요가 없다 — 인터페이스 계약은
-doc submodule이 이미 갖고 있다.
-
-차이는 단순한 효율이 아니다. **재현 가능성**과 **검증 가능성**이
-근본적으로 다르다.
-
-| 측면 | RAG/MCP | Submodule + 직접 read |
+| 측면 | RAG/MCP | Submodule 직접 read |
 |---|---|---|
-| 같은 질의 → 같은 컨텍스트? | 인덱스 상태에 의존 | git SHA 핀이면 항상 동일 |
-| 컨텍스트의 출처 추적 | 인덱싱 metadata 의존 | file_path:line 직접 |
+| 같은 질의 → 같은 컨텍스트 | 인덱스 상태 의존 | git SHA pin 이면 항상 동일 |
+| 컨텍스트 출처 | 인덱스 메타데이터 | `file_path:line` 직접 |
 | 토큰 효율 | 청크 다수 = 폭증 | 필요한 파일만 |
-| 검색 인프라 비용 | 벡터DB 운영 | 0 |
-| Privacy | 외부 인프라 경유 가능 | git 안에서 끝남 |
-| LLM 추론 안정성 | 노이즈로 변동 | 일관 |
+| Privacy | 외부 인프라 가능 | git 안에서 끝 |
+| **참조 위계 강제** | 어려움 (검색이 우선순위 안 봄) | **프롬프트 + grep 으로 강제** |
 
 ---
 
-## 5.3 Programmer's Guide = SW-HW 계약 = AI 생성의 진입점
+## 5.5 표준 Spec PDF (NVMe / PCIe / ONFI) 의 참조 (item 7)
 
-본 워크플로우는 Stage 5 **Programmer's Guide** 를 **SW-HW 계약**으로 둔다.
-이는 AI 자동화 관점에서 결정적인 이점을 가진다:
+NVMe 2.0, PCIe 5.0, ONFI 5.0 같은 표준 spec 은 본 SoC 개발의 **외부 입력**.
+PDF 가 원본 (수백 페이지).
 
-1. **AI가 HAL을 만드는 정해진 입력 형식이 있다**. 가이드 §6 worked example은
-   "어떤 시퀀스로 호출되는가"의 정의이므로, AI는 그 시퀀스를 그대로 C 함수
-   본문 골격으로 1:1 변환할 수 있다.
-2. **AI가 Python coverif scenario를 만드는 정해진 입력 형식이 있다**. 가이드 §6의
-   각 worked example을 FW를 구동하는 Python 시퀀스로 1:1 변환하면 끝.
-3. **AI가 만든 HAL과 scenarios가 가이드와 어긋나면 invariant #3, #4가
-   PR을 fail**시킨다. 즉 AI 출력의 신뢰는 사람이 아니라 CI가 검증.
+**검토한 옵션 3가지**:
 
-> **Tutorial-Driven Development의 SoC 적용**. SW 업계의 *Tutorial-Driven
-> Development*가 "문서를 먼저 쓰고 코드가 따라간다"는 관점이라면, 본
-> 제안은 "RTL → Guide → HAL/Verif"의 SoC 특화 형태이다. AI는 "Guide →
-> HAL/Verif" 구간을 거의 결정론적으로 채울 수 있다.
+| 옵션 | 장점 | 단점 |
+|---|---|---|
+| (a) 모든 PDF 를 Claude 세션에 첨부 | 단순 | 매 세션마다 컨텍스트 폭증, 토큰 비용 |
+| (b) **별도 Spec Repo + submodule** | git 결정론, MD extract 로 AI-friendly, 버전 pin | git LFS 필요 (PDF 큼) |
+| (c) 별도 서버 + MCP 검색 | on-demand | 인프라 부담, latency, MCP 토큰 비용 (§1.3) |
 
----
+**본 제안의 선택 — (b) Spec Repo + submodule**:
 
-## 5.4 AI 자동 생성의 구체적 시나리오 4종
+- Spec Repo 구조:
+  ```
+  spec-repo/
+  ├─ pdfs/                          # git LFS (원본, 법적 참조)
+  │   ├─ nvme-2.0.pdf
+  │   ├─ pcie-5.0-base.pdf
+  │   └─ onfi-5.0.pdf
+  ├─ extracted/                     # 자동 추출 Markdown (AI-friendly)
+  │   ├─ nvme-2.0/
+  │   │   ├─ ch01-introduction.md
+  │   │   ├─ ch04-admin-commands.md
+  │   │   └─ ch07-namespace-management.md
+  │   ├─ pcie-5.0/
+  │   └─ onfi-5.0/
+  └─ index.json                     # 섹션 인덱스 (grep 보조)
+  ```
+- 추출: `pdftotext` + 사내 후처리 (장/절 분리, 표 정리). PR 시 PDF 와 MD 가 짝.
+- FW · Test Repo 가 `doc/spec/` 으로 submodule pin.
+- Claude 는 `grep -rn 'admin queue' doc/spec/extracted/nvme-2.0/` 같은 식으로 **on-demand grep**, 필요한 챕터만 Read.
+- 원본 PDF 가 필요할 때 (예: 법적 compliance review) 사람이 LFS 에서 fetch.
+- 새 spec 버전 → Spec Repo 가 새 tag → FW/Test 가 `spec-v*` submodule update.
 
-### 시나리오 A — RTL → IP-XACT 초안 (Doc Repo)
-- **저장소**: Doc Repo
-- **AI 도구**: Read (RTL Repo fetch) + Edit
-- **입력**: RTL Repo의 `rtl/<ip>.sv` (read-only fetch), 사람이 갱신한 `doc/<ip>/DLD.md §5`
-- **출력**: `doc/<ip>/<ip>.ipxact.xml` 초안
-- **검증**: D1, D2 (RTL ↔ DLD ↔ IP-XACT)
-- **사람의 검토 초점**: "DLD §5의 register map이 RTL을 정확히 반영하고 있는가" (intent)
+**왜 MCP 가 아닌가**:
+- MCP 검색은 §1.3 의 토큰 폭증·latency 폭증 문제 그대로.
+- spec 은 변경 빈도가 낮음 (수년) — on-demand 검색이 결정론적 pin 보다 약하다.
+- 외부 인프라 의존이 늘어남 — submodule 한 줄로 끝나는 일을 서비스로 만들 이유 없음.
 
-### 시나리오 B — IP-XACT → HAL 헤더 (Doc Repo, auto-gen)
-- **저장소**: Doc Repo
-- **AI 도구**: 결정론적 생성기 (AI 없이도 가능, AI는 보강 주석 / Doxygen 보강 용도)
-- **입력**: `doc/<ip>/<ip>.ipxact.xml`
-- **출력**: `include/<ip>_hal.h` — register `#define`, struct, inline accessor
-- **검증**: D3 (IP-XACT의 모든 register/field가 HAL.h에 등장), D5 (HAL.h ↔ Guide §6 함수 시그너처)
-- **사람의 검토 초점**: 매크로 네이밍 일관성 (대부분 컨벤션 자동)
-
-### 시나리오 C — Guide + HAL.h → HAL.c 구현체 (FW Repo)
-- **저장소**: FW Repo (doc/는 submodule)
-- **AI 도구**: Read + Write
-- **입력**: `doc/<ip>/PROGRAMMERS_GUIDE.md §6` (submodule), `doc/include/<ip>_hal.h` (submodule)
-- **출력**: `fw/hal/<ip>_hal.c` 함수 구현체
-- **검증**: F1 (HAL.c export ↔ HAL.h) + `make test` host smoke (F5)
-- **사람의 검토 초점**: 함수 내부 로직의 의도, ISR/락 처리, 펌웨어 컨벤션
-
-### 시나리오 D — Guide → Python coverif scenarios (Test Repo, SSD Host용)
-- **저장소**: Test Repo (FW Repo와 분리)
-- **AI 도구**: Read + Write
-- **입력**: `doc/<ip>/PROGRAMMERS_GUIDE.md §6` (worked examples), §8 (pitfalls)
-- **출력**:
-  - `tests/scenarios/<ip>/sc_<example>.py` — Worked example을 SSD Host에서 NVMe/PCIe 명령 시퀀스로 변환
-  - `tests/scenarios/<ip>/regress_<pitfall>.py` — Pitfall을 회귀 시나리오로
-- **검증**: T1 (worked example ↔ scenario), T2 (pitfall ↔ regression). 실측 실행은 SSD Host가 NVMe 드라이버를 통해 FPGA/Veloce/Zebu의 펌웨어를 구동 (nightly + on-demand regress)
-- **사람의 검토 초점**: scenario coverage, 측정 가능성 (latency·error 카운트·전력 시퀀스), pre/post 검증의 정확성
-
-> **Python scenario 포맷 (예시 스케치 — SSD Host)**:
-> ```python
-> def sc_admin_queue_enable(host):
->     """ Guide §6.2: admin queue enable 시퀀스 (SSD Host 관점) """
->     # host = NVMe driver wrapper (PCIe로 SoC에 연결)
->     host.controller_reset()
->     assert host.csts() == 0
->     host.set_admin_queue_base(host.dma_buf.addr)
->     host.cc_enable(1)                                    # CC.EN = 1
->     host.wait_csts_ready(timeout_ms=10)                  # CSTS.RDY
->     # post-condition (admin doorbell counter via vendor command)
->     assert host.vendor_metric("admin_q_doorbell_count") >= 1
-> ```
-> `host`는 SSD Host에서 NVMe 디바이스를 추상화한 helper. 백엔드(FPGA / Veloce / Zebu)는 PCIe transactor 차이만 있을 뿐 같은 API로 보임.
+**왜 모든 PDF 첨부가 아닌가**:
+- Claude 세션마다 수십 MB 의 spec 텍스트가 컨텍스트에 들어가는 비용 무한.
+- 특정 질의 ("namespace identify 시퀀스") 에 필요한 건 NVMe 의 일부 챕터.
 
 ---
 
-## 5.5 AI 자동화의 안전 boundary
+## 5.6 AI 자동화의 안전 boundary
 
-> **원칙**: AI는 RTL을 자동으로 수정하지 않는다.
+> **원칙**: Claude 는 RTL 을 자동으로 수정하지 않는다. PG 와 HLD/DLD §1-4 도
+> 사람 author. 사실 정합성은 자동화하고, **의도**는 사람이 정의한다.
 
-| AI가 자동 생성하는 산출물 | AI가 자동 수정하지 않는 산출물 |
+| Claude 가 자동 생성하는 산출물 | Claude 가 자동 수정하지 않는 산출물 |
 |---|---|
-| `doc/<ip>/*.rdl` 또는 `*.ipxact.xml` (초안) — Doc Repo | RTL Repo의 `*.sv` (의도가 농축됨) |
-| `doc/include/*_hal.h` (auto-gen) — Doc Repo | `doc/<ip>/DLD.md §1–4` (의도 설명) |
-| `fw/hal/*.c` (초안) — FW Repo | `doc/<ip>/PROGRAMMERS_GUIDE.md` (저자 = SW lead) |
-| `tests/scenarios/*.py` (worked example 변환) — Test Repo | Python scenario의 측정·assertion 의도 (DV 리뷰) |
-| Doxygen 주석 | FW 측 ISR / 락 / DMA 정책 (FW lead 리뷰) |
-| Test 측 NVMe wrapper / host helper 보강 | Test 측 host transactor 정책·플랫폼 매핑 (Validation 리뷰) |
-
-이 boundary는 "AI는 사실(facts) 정합성은 자동화하고, **의도(intent)**는
-사람이 정의한다"는 원칙에 기반한다. RTL과 가이드는 의도가 농축된 산출물
-이므로 자동 수정 대상이 아니다.
-
-다음 장(6장)에서 이 자동화가 **신규 SoC 부트스트랩** 시점에 어떻게
-구체적으로 흘러가는지 End-to-End 워크플로우로 보인다.
+| Design 의 shadow zone 보조 · §1-4 초안 | RTL Repo 의 `*.sv` (의도 농축) |
+| RDL 의 shadow update 보조 · field `desc` 초안 | HLD 전체 (Architect 영역) |
+| IP-XACT XML, HAL.h (auto-gen, peakrdl) | DLD §1-4 (RTL designer 설계 의도) |
+| PG §6 worked example 초안 (기존 사용 패턴 추출) | PG 의 SW-HW 계약 의사결정 |
+| HAL.c 본문 (Claude + 검토) | FW 의 ISR / 락 / DMA 정책 |
+| FW driver/app 패치 | Test 의 측정·assertion 의도 |
+| Python coverif scenario | Spec PDF / 추출 MD 의 의미 해석 |

@@ -6,34 +6,66 @@ SoC 도메인을 매핑하면 5종이 자연스럽게 도출된다.
 
 ---
 
-## 3.1 5종 산출물 정의
+## 3.1 5종 문서 산출물 + 3종 코드 산출물 + 1종 외부 reference
+
+### 문서 산출물 (5종)
 
 | # | 산출물 | 포맷 | 책임자 | 1줄 정의 | 사는 저장소 |
 |---|---|---|---|---|---|
-| 1 | **HLD** (High Level Description) | Markdown + Mermaid | IP architect | IP의 목적·블록 구조·외부 인터페이스의 **개념적 설명** | Doc Repo |
-| 2 | **DLD** (Detailed Level Description, 일명 DESIGN.md) | Markdown + Mermaid + WaveDrom | RTL designer | RTL의 구현 디테일 — FSM·timing·port table·register map | Doc Repo |
-| 3 | **Programmer's Guide** | Markdown | SW lead (저자) + RTL designer (리뷰) | SW 개발자가 "이 IP를 어떻게 쓰는가"를 익히는 **How-to** + **worked examples** | Doc Repo |
-| 4 | **SFR** (SystemRDL `.rdl` author + IP-XACT XML interchange) | SystemRDL 2.0 + IEEE 1685-2022 XML | RTL designer | Register/field-level **기계 판독 가능 reference** — `peakrdl-*`로 XML / HAL.h / Markdown 일괄 emit | Doc Repo |
-| 5 | **HAL API 헤더** | C 헤더 (`<ip>_hal.h`) + Doxygen 주석 | RTL designer / 자동 생성 | 함수 시그너처·전제조건·반환값의 **reference** (SW-HW 계약) | Doc Repo (auto-gen) |
+| 1 | **HLD** | Markdown + Mermaid | Architect | IP 의 목적·블록·외부 인터페이스 **개념 설명** | **② Design Repo** |
+| 2 | **DLD** | Markdown + Mermaid + WaveDrom | RTL designer | RTL 의 구현 디테일 — FSM·timing·port table·register map | **② Design Repo** (HLD 와 같은 repo) |
+| 3 | **Programmer's Guide** | Markdown | SW lead (저자) + RTL designer (리뷰) | SW 개발자의 SW-HW 계약 — How-to + worked example | **④ PG Repo** |
+| 4 | **SFR (SystemRDL)** | `.rdl` author + IP-XACT XML interchange (peakrdl auto-gen) | RTL designer | Register/field-level **기계 판독 가능 reference** | **③ RDL Repo** |
+| 5 | **HAL API 헤더** | C 헤더 + Doxygen 주석 (peakrdl auto-gen from RDL) | RTL designer | 함수 시그너처·전제조건의 **reference** (SW-HW 계약 코드 표현) | **⑤ HAL Repo** |
 
-위 5종은 모두 **Doc Repo가 단일 출처**이며, **FW Repo와 Test Repo가 각자
-`doc/` submodule로 소비**한다. 두 저장소는 그 위에 자기 영역의 산출물을 얹는다:
+### 코드 산출물 (3종)
 
-| 산출물 | 포맷 | 책임자 | 1줄 정의 | 사는 저장소 | 실행 위치 |
-|---|---|---|---|---|---|
-| HAL `.c` 구현 | C source | FW engineer | HAL.h 시그너처에 대한 펌웨어 구현 | **FW Repo** | FPGA · Veloce · Zebu |
-| Driver / App firmware | C source | FW engineer | SSD Controller 기능 펌웨어 (NVMe, FTL 등) | **FW Repo** | FPGA · Veloce · Zebu |
-| Host smoke / 단위 테스트 | Python / C | FW | HAL.c 단위 검증 (시뮬레이션 없음) | **FW Repo** | CI runner |
-| **Python coverif scenarios** | Python (`tests/scenarios/*.py`) | DV / Validation | Guide §6 worked example·§8 pitfall을 NVMe/PCIe 시퀀스로 변환 | **Test Repo** | **SSD Host (Linux 서버)** |
-| Host helper · NVMe driver wrapper | Python | DV | 검증 플랫폼·NVMe 추상 (FPGA · Veloce · Zebu 백엔드 공통) | **Test Repo** | **SSD Host** |
+| 산출물 | 포맷 | 책임자 | 사는 저장소 | 실행 위치 |
+|---|---|---|---|---|
+| HAL.c 구현 | C source | Claude Code (1차) + FW lead 검토 | **⑤ HAL Repo** (HAL.h 와 같이) | FPGA · Veloce · Zebu |
+| Driver / App firmware | C source | Claude Code + FW lead | **⑦ FW Repo** | FPGA · Veloce · Zebu |
+| Python coverif scenarios + host helper | Python (`tests/scenarios/*.py`) | Claude Code + DV 보강 | **⑧ Test Repo** | SSD Host (Linux) |
 
-이 9개의 산출물이 **4개 저장소 안에 명확히 위치**한다. AI가 컨텍스트를
-구성할 때 어느 파일을 읽어야 할지에 모호함이 없다.
+### 외부 reference 산출물 (1종)
 
-> **왜 FW 산출물과 Test 산출물이 다른 저장소인가** — FW는 SoC 위에서 도는
-> 코드(C 임베디드 빌드)이고, Test는 Host에서 SoC를 구동하는 Python이다.
-> 책임 부서 · 언어 · 툴체인 · 릴리스 주기 · 보안 boundary가 모두 다르다.
-> 같은 저장소에 두면 권한 분리가 무너지고 release 주기가 강제로 묶인다.
+| 산출물 | 포맷 | 책임자 | 사는 저장소 |
+|---|---|---|---|
+| 표준 spec (NVMe / PCIe / ONFI) | PDF (git LFS) + 자동 추출 Markdown | Standards 담당 | **⑥ Spec Repo** |
+
+### 산출물 ↔ 저장소 매핑 한눈에
+
+```
+RTL Repo ①           rtl/**/*.sv
+                      ↓ (Phase 1 fetch)
+Design Repo ②        HLD.md, DLD.md
+RDL Repo ③           .rdl, IP-XACT XML
+                      ↓ (PG 가 참조)
+PG Repo ④            Programmer's Guide
+                      ↓ (HAL 이 참조)
+HAL Repo ⑤           HAL.h (auto), HAL.c
+Spec Repo ⑥          NVMe/PCIe PDF + MD
+                      ↓ (Phase 2 submodule)
+FW Repo ⑦            driver, app firmware
+Test Repo ⑧          Python coverif
+```
+
+> **8개 저장소 안에 명확히 위치**. Claude 가 컨텍스트를 구성할 때 어느 파일을
+> 읽어야 할지에 모호함이 없다. 참조 위계 (§5.2): PG/RDL primary → DLD fallback
+> → RTL 금지.
+
+> **왜 HLD/DLD 는 같은 저장소, PG/RDL 은 별도 저장소인가** — HLD/DLD 는
+> 작성자 (Architect/RTL designer) 와 생애주기가 같다. PG 는 다른 작성자 (SW lead)
+> 와 다른 트리거 (SW-facing API 결정) 로 갱신된다. RDL 은 RTL 변경 시점에 sync
+> 되며 매우 잦은 변경을 받는다. 분리하면 한 사람의 PR 이 다른 두 사람을 자주
+> conflict 시키지 않는다.
+
+> **왜 HAL 이 별도 저장소인가** — HAL.h 는 RDL 에서 auto-gen, HAL.c 는 Claude
+> 가 PG 보고 작성. 둘 다 SW-HW 계약의 코드 표현. FW 가 아닌 다른 컨슈머 (사내
+> 다른 펌웨어, 단위 테스트 러너) 도 HAL 만 끌어다 쓸 수 있도록 분리.
+
+> **왜 FW 산출물과 Test 산출물이 다른 저장소인가** — FW 는 SoC 위에서 도는
+> C 펌웨어, Test 는 Host 에서 SoC 를 구동하는 Python. 책임 부서·언어·툴체인·
+> 릴리스 주기·보안 boundary 가 모두 다르다.
 
 ---
 

@@ -9,7 +9,10 @@
 
 | # | 리스크 | 영향 | 완화책 |
 |---|---|---|---|
-| R0 | **현재 산출물 포맷 마이그레이션** — HLD/DLD가 Word, SFR이 Excel | 본 제안 채택 전 변환 필요 | **Phase 0 (M0)**: Pandoc으로 Word→Markdown, Excel→SystemRDL 자동 변환 스크립트. 사람이 만지는 페이지를 표 제목·헤딩 보정 정도로 제한. 9.3 §에서 상세 |
+| R0 | **현재 산출물 포맷 마이그레이션** — HLD/DLD가 Word, SFR이 Excel, 표준 spec PDF | 본 제안 채택 전 변환 필요 | **Phase 0 (M0)**: Pandoc 으로 Word→Markdown, Excel→SystemRDL 자동 변환, PDF→Markdown extract (`pdftotext` + 사내 후처리). 사람이 만지는 페이지를 표 제목·헤딩 보정 정도로 제한. 9.3 §에서 상세 |
+| R10 | **3개 문서 저장소 (Design/RDL/PG) 의 수동 편집 정합성** | 자유 편집 시 drift 가능 | **Hybrid: authored zone (자유) + shadow zone (자동 sync, 수동 차단)**. shadow zone 은 마크다운 주석 `<!-- @shadow:gen -->` 으로 명시, CI 가 수동 편집 PR 차단. §4.2.0 참고 |
+| R11 | **표준 spec PDF (NVMe/PCIe/ONFI) 참조 방식** | 모두 첨부 / MCP / submodule 3개 옵션 trade-off | **Spec Repo + submodule (LFS PDF + auto MD extract)**. MCP·전체 첨부 모두 배제. §5.5 참고 |
+| R12 | **Claude Code 가 자체 검증 단계를 건너뛸 위험** | self-check 안 하면 CI 가 fail 하는 PR 다수 | CI invariant 가 신뢰의 마지막 관문 — self-check 는 latency·노이즈 절감 도구. Skip 해도 결과는 같음. |
 | R1 | FW/Test Repo의 `git submodule` 학습 곡선 | FW/DV 엔지니어가 익숙하지 않음 | 양쪽 저장소의 `make doc-update` · `make doc-pin <tag>` 한 줄 wrapper. 일반 사용자는 submodule 명령 직접 입력 안 함 |
 | R2 | 대용량 binary / waveform / FPGA bitstream | git에 두기 무거움 | git LFS 또는 별도 artifact bucket (S3). RTL/문서/HAL/Python은 git, bitstream/wave는 별도 |
 | R3 | Doc submodule 핀이 detached HEAD로 떠도는 위험 | FW/Test가 임의 commit을 가리킬 가능성 | FW Repo F2, Test Repo T3 invariant — submodule SHA가 Doc Repo의 release tag와 일치하는지 강제 |

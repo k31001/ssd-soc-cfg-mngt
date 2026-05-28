@@ -19,70 +19,152 @@
 
 ---
 
-## 4.2 Invariant — 3개 저장소(Doc / FW / Test) CI로 분산
+## 4.2 Invariant — 8개 저장소 CI 매트릭스 + Hybrid 정책
 
-정합성 검사는 한 곳에서 모두 일어나지 않는다. **Doc Repo CI**는 RTL과
-문서의 일치를, **FW Repo CI**는 그 문서(submodule)와 펌웨어의 일치를,
-**Test Repo CI**는 그 문서와 Python coverif scenario의 일치를 본다.
-경계 위의 일관성(FW와 Test가 같은 doc-tag를 보고 있는가)은 **release
-gate**가 본다.
+정합성 검사는 한 곳에서 일어나지 않는다. **각 저장소의 CI** 가 자기 경계
+안의 invariant 를 검사하고, **Release gate** 가 8개 저장소의 tag 정렬을
+확정한다.
 
-### 4.2.1 Doc Repo CI invariant
+### 4.2.0 핵심 정책 — Authored Zone vs Shadow Zone (item 4)
 
-Doc Repo는 PR 시점에 RTL Repo를 read-only fetch한 뒤 다음을 검사한다:
+문서를 3개 저장소로 분리하면 **수동 변경이 늘어 정합성 이슈**가 생긴다.
+두 가지 접근:
 
-| # | Invariant | Source A | Source B |
-|---|---|---|---|
-| D1 | RTL ↔ DLD §5 register map | RTL Repo의 `rtl/**/*.sv` (fetch) | `doc/<ip>/DLD.md §5` |
-| D2 | DLD §5 ↔ SFR (RDL/XACT) | `doc/<ip>/DLD.md §5` | `doc/<ip>/<ip>.rdl` 또는 `.ipxact.xml` |
-| D3 | SFR ↔ HAL.h (auto-gen) | `<ip>.rdl` / `.ipxact.xml` | `include/<ip>_hal.h` |
-| D4 | Diagram source ↔ SVG | `doc/<ip>/diagrams/*.json` | `doc/<ip>/diagrams/*.svg` |
-| D5 | HAL.h ↔ Programmer's Guide §6 함수 목록 | `include/<ip>_hal.h` | `doc/<ip>/PROGRAMMERS_GUIDE.md §6` |
+| 옵션 | 내용 | 약점 |
+|---|---|---|
+| (a) 수동 변경 전면 금지 | 모든 문서를 RTL → auto-gen | HLD 설계 의도, PG worked example 같은 **인간 지식이 사라짐** |
+| (b) 수동 변경 자유 + 사후 정합성 자동화 | 사람이 자유 편집, CI 가 검사·정정 | 큰 수동 편집은 자동 정정이 불가능 — 결국 (a) 와 같은 문제로 회귀 |
 
-Doc Repo가 PR pass + 새 tag release하면, **FW Repo와 Test Repo가 모두**
-그 tag로 submodule을 끌어올린다.
+**본 제안의 선택 — Hybrid: Authored Zone + Shadow Zone**.
 
-### 4.2.2 FW Repo CI invariant
+각 문서를 두 영역으로 명확히 분리한다:
 
-FW Repo는 Doc Repo가 `doc/`에 submodule로 mount되어 있는 상태에서
-펌웨어 영역을 검사한다:
+- **Authored zone** (사람이 자유 편집)
+  - HLD 전체, DLD §1-4 (개념·FSM·timing 설명)
+  - PG §1-5 (개념·시퀀스), §6 worked example, §8 pitfall, §7 performance tips
+  - RDL 의 field `desc` 텍스트
+  - HAL.c 본문, FW driver/app, Python scenario 의 측정·assertion
+- **Shadow zone** (자동 생성, **수동 편집 차단**)
+  - DLD §5 register map 표 (RTL 에서 sync)
+  - RDL 의 register/field offset·width·access (RTL 에서 sync)
+  - IP-XACT XML 전체 (RDL 에서 peakrdl)
+  - HAL.h 전체 (RDL 에서 peakrdl)
+  - PG §6 의 함수 시그너처 부분 (HAL.h 에서 sync)
 
-| # | Invariant | Source A | Source B |
-|---|---|---|---|
-| F1 | HAL.c export ↔ HAL.h (submodule) | `doc/include/<ip>_hal.h` | `fw/hal/<ip>_hal.c` |
-| F2 | FW Repo `doc/` SHA 단조 증가 | `doc/` submodule SHA | 이전 release tag |
-| F3 | Host smoke pass | `fw/hal/*_hal.c` + `fw/tests/host/*` | `make test` 결과 |
+각 shadow zone 은 마크다운 주석 `<!-- @shadow:gen -->...<!-- @shadow:end -->`
+으로 명시되고, CI 가 그 안의 수동 변경을 PR 차단. authored zone 은 자유.
 
-### 4.2.3 Test Repo CI invariant
+이 정책의 효과:
+- **사람 지식 보존** — HLD 설계 의도, PG worked example, RDL field desc 는 그대로 사람이 쓴다.
+- **drift 차단** — register offset·width·시그너처 같은 "사실"은 자동 sync, 사람이 만지면 차단.
+- **명확한 경계** — 어디까지가 사람 영역인지 PR 시점에 매우 명확.
 
-Test Repo는 같은 Doc Repo submodule을 mount한 상태에서 SSD Host에서
-실행될 Python coverif scenario의 정합성을 검사한다:
-
-| # | Invariant | Source A | Source B |
-|---|---|---|---|
-| T1 | Python scenarios ↔ Guide §6 worked example | `doc/<ip>/PROGRAMMERS_GUIDE.md §6` | `tests/scenarios/<ip>/sc_*.py` |
-| T2 | Python regression ↔ Guide §8 pitfall | `doc/<ip>/PROGRAMMERS_GUIDE.md §8` | `tests/scenarios/<ip>/regress_*.py` |
-| T3 | Test Repo `doc/` SHA 단조 증가 | `doc/` submodule SHA | 이전 release tag |
-| T4 | Scenario static check (pytest collect, lint) | `tests/scenarios/**/*.py` | `pytest --collect-only` 결과 |
-
-### 4.2.4 Release gate — FW와 Test의 doc 정렬
-
-릴리스 매니페스트를 만드는 별도 CI 단계(또는 사람 사인오프)가 다음을 강제한다:
+### 4.2.1 RTL Repo CI
 
 | # | Invariant | Source A | Source B |
 |---|---|---|---|
-| R1 | FW와 Test가 같은 doc-tag를 본다 | FW Repo의 `doc/` SHA | Test Repo의 `doc/` SHA |
-| R2 | Release manifest의 4-tuple 완결 | `rtl-v* × doc-v* × fw-v* × test-v*` | 모든 tag 존재·접근 가능 |
+| RT1 | Verible lint clean | `rtl/**/*.sv` | lint rules |
+| RT2 | Smoke synth (가능한 IP) | `rtl/**/*.sv` | Verilator/yosys 합성 |
 
-R1이 위반되면 "FW는 doc v2.5, Test는 doc v2.4로 검증" 같은 미세 분기가
-발생해 결과 해석이 불가능해진다. 따라서 release 시점 강제.
+RTL Repo 는 다른 저장소가 fetch 할 source. tag `rtl-v*` 가 Phase 1 입력.
 
-### 4.2.5 본 레포의 참조 구현 — Concept 검증
+### 4.2.2 Design Repo CI (HLD / DLD)
 
-본 레포 [`tools/ipflow.py`](../../tools/ipflow.py)는 이 invariant들의
-**개념 증명**으로, 한 저장소 안에서 모든 단계를 실증한다 (`scenarios.yaml`
-+ SV TB는 IP-level smoke). 실제 운영은 위 4-repo 분리 모델로 이행하며,
-같은 invariant가 Doc / FW / Test 저장소 CI에 흩어진다.
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| D1 | RTL ↔ DLD §5 shadow zone | RTL Repo (fetch) | `<ip>/DLD.md` shadow block |
+| D2 | DLD §5 shadow 수동 편집 차단 | git diff | shadow annotation 영역 |
+| D3 | HLD ↔ DLD §1 cross-ref | `HLD.md` | `DLD.md §1` |
+| D4 | Diagram source ↔ SVG | `diagrams/*.json` | `diagrams/*.svg` |
+
+Pass → tag `design-v*`.
+
+### 4.2.3 RDL Repo CI (SystemRDL)
+
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| R1 | RTL ↔ RDL shadow zone | RTL Repo (fetch) | `<ip>.rdl` shadow block (offset·width·access) |
+| R2 | RDL shadow 수동 편집 차단 | git diff | shadow annotation 영역 |
+| R3 | RDL → IP-XACT XML emit OK | `<ip>.rdl` | peakrdl 출력 |
+
+Pass → tag `rdl-v*`.
+
+### 4.2.4 PG Repo CI (Programmer's Guide)
+
+PG Repo 는 Design Repo + RDL Repo 를 submodule (또는 read-only fetch) 로
+참조하며 다음을 검사:
+
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| P1 | HAL.h export ↔ PG §6 함수 시그너처 (shadow) | `hal-v*` 의 HAL.h | PG §6 shadow block |
+| P2 | PG §6 shadow 수동 편집 차단 | git diff | shadow annotation |
+| P3 | PG 가 참조하는 RDL register 가 실재 | `rdl-v*` | PG cross-ref |
+| P4 | PG 가 RTL 을 직접 참조하지 않음 (regex) | PG markdown | "RTL", "*.sv" 직접 링크 금지 |
+
+Pass → tag `pg-v*`.
+
+### 4.2.5 HAL Repo CI
+
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| H1 | HAL.h 전체가 RDL → peakrdl 결과와 일치 | `rdl-v*` peakrdl emit | `HAL.h` |
+| H2 | HAL.c export ↔ HAL.h declaration | `HAL.h` | `HAL.c` symbol table |
+| H3 | Host smoke pass | `HAL.c` + mock | `make test` |
+| H4 | HAL Repo 의 `rdl/` submodule SHA 단조 증가 | submodule SHA | tag history |
+
+Pass → tag `hal-v*`.
+
+### 4.2.6 FW Repo CI
+
+FW Repo 는 5개 submodule (HAL · PG · RDL · Design · Spec) mount 상태에서:
+
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| F1 | HAL.c export ↔ FW 가 호출하는 HAL 함수 | submodule `hal-v*` 의 HAL.h | `fw/**/*.c` |
+| F2 | 5개 submodule SHA 단조 증가 | submodule SHA | 이전 release tag |
+| F3 | FW 가 RTL 을 직접 include 하지 않음 (정적 검사) | FW source | `#include` 그래프 |
+| F4 | Host smoke pass | FW source + mock | `make test` |
+| F5 | Build OK (target toolchain) | FW source | binary |
+
+Pass → tag `fw-v*`.
+
+### 4.2.7 Test Repo CI
+
+Test Repo 는 4개 submodule (PG · RDL · Design · Spec) mount 상태에서:
+
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| T1 | Python scenarios ↔ PG §6 worked example | submodule `pg-v*` §6 | `tests/scenarios/<ip>/sc_*.py` |
+| T2 | Python regression ↔ PG §8 pitfall | submodule `pg-v*` §8 | `tests/scenarios/<ip>/regress_*.py` |
+| T3 | 4개 submodule SHA 단조 증가 | submodule SHA | 이전 release tag |
+| T4 | Test 가 RTL 을 직접 참조하지 않음 (정적 검사) | Test source | `import`·string 검색 |
+| T5 | pytest --collect-only + lint | `tests/**/*.py` | pytest |
+
+Pass → tag `test-v*`.
+
+### 4.2.8 Spec Repo CI
+
+| # | Invariant | Source A | Source B |
+|---|---|---|---|
+| S1 | 각 PDF 와 자동 추출 MD 의 짝 존재 | `*.pdf` (LFS) | `extracted/*.md` |
+| S2 | MD extract 가 stale 이 아님 | PDF mtime | extract mtime |
+
+Pass → tag `spec-v*`.
+
+### 4.2.9 Release Gate (cross-repo)
+
+| # | Invariant | 의미 |
+|---|---|---|
+| R1 | FW · Test 가 5개 doc submodule (Design · RDL · PG · HAL [FW only] · Spec) 의 SHA 를 같게 핀 | "두 팀이 같은 SW-HW 계약을 보고 있다" 강제 |
+| R2 | Release manifest 의 9-tuple 완결 | `rtl-v* × design-v* × rdl-v* × pg-v* × hal-v* × spec-v* × fw-v* × test-v*` 가 모두 존재 |
+
+R1 위반 = "FW 는 PG v3, Test 는 PG v2 로 검증" 같은 미세 분기 → 결과 해석 불가 → release 차단.
+
+### 4.2.10 본 레포의 참조 구현 — Concept 검증
+
+본 레포 [`tools/ipflow.py`](../../tools/ipflow.py) 는 이 invariant 들의
+**개념 증명**으로, 한 저장소 안에서 모든 단계를 실증한다. 실제 운영은 위
+8-repo 분리 모델로 이행하며, 같은 invariant 가 8개 CI 에 흩어진다.
 
 ---
 
@@ -160,13 +242,16 @@ RTL/FW/Test의 PR을 blocking하지 않고, (b) FW와 Test가 같은 doc-tag를
   믿을 필요가 없고, CI가 신뢰의 마지막 관문이 된다.
 
 ### (d) 문서 ↔ 검증의 닫힌 루프
-- Programmer's Guide §6의 worked example이 Test Repo의 Python scenario에
-  등재되지 않으면 **T1 invariant fail**.
-- Guide §8의 pitfall이 회귀 시나리오로 변환되지 않으면 **T2 invariant fail**.
-- 즉 "**문서가 약속한 것은 반드시 검증된다**." 가이드가 곧
-  verification plan이 되며, 별도 v-plan 산출물이 필요 없어진다.
-- 실측 플랫폼은 SV TB가 아니라 **FPGA + Veloce/Zebu에서 펌웨어가
-  실행**되고, **SSD Host의 Python**이 NVMe·PCIe 명령·전력 시퀀스·에러 주입을 구동한다 — 실제 SSD가 동작하는 환경과 동일.
+- PG §6 worked example 이 Test Repo Python scenario 에 등재되지 않으면 **T1 fail**.
+- PG §8 pitfall 이 회귀 시나리오로 변환되지 않으면 **T2 fail**.
+- 즉 "**문서가 약속한 것은 반드시 검증된다**." PG 가 곧 verification plan.
+- 실측 플랫폼은 SV TB 가 아니라 **FPGA + Veloce/Zebu** 에서 펌웨어 실행 + **SSD Host** 의 Python 이 NVMe·PCIe 로 구동.
+
+### (e) RTL 직접 참조 차단의 구조적 보장
+- PG 가 RTL 을 직접 참조하면 **P4 fail** (PG 안에 `*.sv` 링크 정규식).
+- FW source 가 RTL header 를 include 하면 **F3 fail** (`#include` 정적 분석).
+- Test source 가 RTL 을 import 하거나 path 로 언급하면 **T4 fail**.
+- 이 셋이 함께 작동해 §5.2 의 참조 위계 규칙 ("RTL 직접 참조 금지") 을 **구조적**으로 보장한다.
 
 ---
 
