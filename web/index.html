@@ -18,12 +18,12 @@
         <strong>본 레포의 9-stage 흐름</strong> (아래 §1) 은 그 운영 모델의 <em>단일 저장소 개념 증명</em>.
       </p>
       <nav>
-        <a href="#production" style="font-weight:600">Production (4-repo)</a>
+        <a href="#production" style="font-weight:600">Production (8-repo)</a>
+        <a href="#repo-structure">저장소 구조</a>
+        <a href="#ci-systems">CI 시스템</a>
+        <a href="#conversion-tools">변환 도구</a>
         <a href="#workflow">Concept (9-stage)</a>
         <a href="#stages">Stages</a>
-        <a href="#status">Live Status</a>
-        <a href="#trace">irq_ctrl Trace</a>
-        <a href="#harness">Harness</a>
         <a href="report/" style="font-weight:600">📘 제안 보고서</a>
         <a href="present/" style="font-weight:600">▶ 발표 모드</a>
       </nav>
@@ -190,88 +190,279 @@ flowchart TD
       </table>
     </section>
 
-    <!-- ─────────── Section 3: Live status ─────────── -->
-    <section id="status">
-      <h2>3. Live status (이 레포의 25개 IP)</h2>
-      <p><code>tools/ipflow.py status --json</code> 의 출력을 그대로 읽는다. CI가 push 마다 갱신.</p>
-      <div id="status-table">Loading…</div>
+    <!-- ─────────── Section 3: Repository structure ─────────── -->
+    <section id="repo-structure">
+      <h2>3. 저장소 구조 — 8개 repo 의 디렉터리 한눈에</h2>
+      <p>모든 산출물은 정해진 위치에 산다. Claude Code 가 컨텍스트를 모을 때 모호함이 없도록 디렉터리 컨벤션이 표준화되어 있다.</p>
+
+      <pre><code>┌─ ① rtl-repo/ ─────────────────────────────────┐
+│  rtl/&lt;ip&gt;/*.sv               # Verilog RTL    │
+│  lint/                       # Verible 룰      │
+│  scripts/synth.tcl           # 합성 스크립트    │
+└────────────────────────────────────────────────┘
+
+┌─ ② design-repo/ ──────────────────────────────┐
+│  &lt;ip&gt;/HLD.md                                  │
+│  &lt;ip&gt;/DLD.md                                  │
+│      ├─ §1-4 (사람 authored)                  │
+│      └─ §5 regmap  ←@shadow:gen (RTL→auto)    │
+│  &lt;ip&gt;/diagrams/                               │
+│      ├─ *.json    (Mermaid·WaveDrom source)   │
+│      └─ *.svg     (auto-render)               │
+└────────────────────────────────────────────────┘
+
+┌─ ③ rdl-repo/ ─────────────────────────────────┐
+│  &lt;ip&gt;/&lt;ip&gt;.rdl              # SystemRDL author │
+│      ├─ offset·width  ←@shadow:gen            │
+│      └─ field desc (사람)                      │
+│  &lt;ip&gt;/&lt;ip&gt;.ipxact.xml       # peakrdl auto    │
+└────────────────────────────────────────────────┘
+
+┌─ ④ pg-repo/ ──────────────────────────────────┐
+│  &lt;ip&gt;/PROGRAMMERS_GUIDE.md                    │
+│      ├─ §1-5 개념·시퀀스 (사람)                │
+│      ├─ §6 worked example (사람 + Claude 초안) │
+│      │   └─ 시그너처 부분 ←@shadow:gen         │
+│      └─ §8 pitfall (incident log 추출)         │
+└────────────────────────────────────────────────┘
+
+┌─ ⑤ hal-repo/ ─────────────────────────────────┐
+│  include/&lt;ip&gt;_hal.h          # peakrdl auto   │
+│  src/&lt;ip&gt;_hal.c              # Claude 작성    │
+│  tests/host/                 # host smoke test │
+│  rdl/                        # submodule (RDL) │
+└────────────────────────────────────────────────┘
+
+┌─ ⑥ spec-repo/ ────────────────────────────────┐
+│  pdfs/nvme-2.0.pdf           # git LFS         │
+│  pdfs/pcie-5.0-base.pdf      # git LFS         │
+│  extracted/&lt;spec&gt;/ch*.md     # auto MD extract │
+│  index.json                  # 섹션 인덱스      │
+└────────────────────────────────────────────────┘
+
+┌─ ⑦ fw-repo/ ──────────────────────────────────┐
+│  fw/drivers/                                  │
+│  fw/app/                                      │
+│  doc/    ← submodules                         │
+│     ├─ design/   (Design Repo)                │
+│     ├─ rdl/      (RDL Repo)                   │
+│     ├─ pg/       (PG Repo)                    │
+│     ├─ hal/      (HAL Repo)                   │
+│     └─ spec/     (Spec Repo)                  │
+│  Makefile                                     │
+└────────────────────────────────────────────────┘
+
+┌─ ⑧ test-repo/ ────────────────────────────────┐
+│  tests/scenarios/&lt;ip&gt;/sc_*.py    # worked     │
+│  tests/scenarios/&lt;ip&gt;/regress_*.py # pitfall  │
+│  tests/lib/nvme_host.py                       │
+│  doc/    ← submodules                         │
+│     ├─ design/  ├─ rdl/                       │
+│     ├─ pg/      └─ spec/                      │
+│  pytest.ini                                   │
+└────────────────────────────────────────────────┘</code></pre>
+
+      <p class="caption">
+        Submodule 디렉터리 명 (<code>doc/design/</code>, <code>doc/rdl/</code> 등) 은 prompt 컨벤션과 직결.
+        Claude 의 시스템 프롬프트가 이 path 를 그대로 지시한다.
+      </p>
     </section>
 
-    <!-- ─────────── Section 4: irq_ctrl trace ─────────── -->
-    <section id="trace">
-      <h2>4. <code>irq_ctrl</code> closed-loop trace</h2>
-      <p>가이드 §6 worked example → scenarios.yaml → SystemVerilog TB task 매핑을 시각화. 끊긴 화살표가 있으면 <code>ipflow validate</code> 가 그것을 잡아낸다.</p>
-      <div class="mermaid">
-flowchart LR
-    subgraph Guide["Programmer's Guide §6"]
-      direction TB
-      G1["§6.1 UART RX (level)"]
-      G2["§6.2 DMA done (edge)"]
-      G3["§6.3 Soft-IRQ debug"]
-      G4["§6.4 Critical section"]
-    end
-    subgraph Scenarios["verif/scenarios.yaml"]
-      direction TB
-      S04[S04 level_source]
-      S05[S05 edge_source]
-      S06[S06 threshold_gating]
-      S08[S08 claim_atomic_clear]
-      S09[S09 pending_clear_w1c]
-    end
-    subgraph TB["sim/tb_irq_ctrl.sv"]
-      direction TB
-      T4[T4 inline check]
-      T5[T5 inline check]
-      T6[T6 inline check]
-      T8[T8 inline check]
-      T9[T9 inline check]
-    end
+    <!-- ─────────── Section 4: CI systems ─────────── -->
+    <section id="ci-systems">
+      <h2>4. 필요한 CI 시스템</h2>
+      <p>저장소 9개 (8 repo + 1 release-gate) 각각이 자기 영역의 invariant 를 검사한다. GitHub Actions 기반.</p>
 
-    G1 --> S04
-    G2 --> S05
-    G2 --> S08
-    G2 --> S09
-    G3 --> S05
-    G4 --> S06
+      <table class="stages-table">
+        <thead>
+          <tr>
+            <th>Repo</th>
+            <th>워크플로우</th>
+            <th>주요 invariant / job</th>
+            <th>runner</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>① RTL</td>
+            <td><code>rtl-ci.yml</code></td>
+            <td>Verible lint · Verilator smoke synth</td>
+            <td>ubuntu-latest</td>
+          </tr>
+          <tr>
+            <td>② Design</td>
+            <td><code>design-ci.yml</code></td>
+            <td>RTL fetch · D1 shadow check · D2 shadow lock · D3 HLD↔DLD · D4 diagram render·diff</td>
+            <td>ubuntu-latest</td>
+          </tr>
+          <tr>
+            <td>③ RDL</td>
+            <td><code>rdl-ci.yml</code></td>
+            <td>RTL fetch · R1 shadow check · R2 shadow lock · R3 peakrdl emit OK</td>
+            <td>ubuntu-latest</td>
+          </tr>
+          <tr class="hl">
+            <td>④ PG</td>
+            <td><code>pg-ci.yml</code></td>
+            <td>Design+RDL submodule · P1 HAL.h↔§6 · P2 shadow lock · <strong>P4 RTL 직접 참조 금지 (regex)</strong></td>
+            <td>ubuntu-latest</td>
+          </tr>
+          <tr>
+            <td>⑤ HAL</td>
+            <td><code>hal-ci.yml</code></td>
+            <td>RDL submodule · H1 HAL.h=peakrdl(RDL) · H2 HAL.c↔HAL.h · H3 host smoke (make test)</td>
+            <td>ubuntu-latest</td>
+          </tr>
+          <tr>
+            <td>⑥ Spec</td>
+            <td><code>spec-ci.yml</code></td>
+            <td>git LFS · S1 PDF↔MD pair check · S2 extract not stale</td>
+            <td>ubuntu-latest + LFS</td>
+          </tr>
+          <tr class="hl">
+            <td>⑦ FW</td>
+            <td><code>fw-ci.yml</code></td>
+            <td>5 submodule · F1 HAL 콜↔HAL.h · F2 submodule monotonic · <strong>F3 RTL #include 금지 (정적 분석)</strong> · F4 host smoke · F5 build (target toolchain)</td>
+            <td>ubuntu-latest + cross-compiler</td>
+          </tr>
+          <tr class="hl">
+            <td>⑧ Test</td>
+            <td><code>test-ci.yml</code></td>
+            <td>4 submodule · T1 Python↔§6 · T2 regress↔§8 · <strong>T4 RTL 참조 금지</strong> · T5 pytest --collect-only</td>
+            <td>ubuntu-latest + Python 3.11</td>
+          </tr>
+          <tr style="background:rgba(253,246,178,0.18)">
+            <td>Release</td>
+            <td><code>release-gate.yml</code></td>
+            <td><strong>R1: FW · Test 의 5/4 doc submodule SHA 정렬</strong> · R2: 9-tuple manifest 완결</td>
+            <td>ubuntu-latest</td>
+          </tr>
+          <tr>
+            <td>—</td>
+            <td><code>coverif-nightly.yml</code></td>
+            <td>FW binary load · Python scenario regress · metric/coverage 수집</td>
+            <td><strong>self-hosted</strong> (FPGA / Veloce / Zebu 접근)</td>
+          </tr>
+        </tbody>
+      </table>
 
-    S04 --> T4
-    S05 --> T5
-    S06 --> T6
-    S08 --> T8
-    S09 --> T9
-      </div>
+      <h3>필요한 인프라</h3>
+      <ul>
+        <li><strong>GitHub Actions</strong> — 본 표의 9 워크플로우 (PR-blocking required status check)</li>
+        <li><strong>Self-hosted runners</strong> — FPGA·Veloce·Zebu 가 있는 lab 환경에 배치 (nightly coverif)</li>
+        <li><strong>git LFS</strong> — Spec Repo 의 PDF · bitstream artifact 보관 (또는 S3)</li>
+        <li><strong>Required Status Checks</strong> — main branch protection 에서 위 워크플로우 모두 required 로 표시</li>
+        <li><strong>알림</strong> — Slack/email — release-gate fail 시 즉시 통보</li>
+      </ul>
     </section>
 
-    <!-- ─────────── Section 5: Harness commands ─────────── -->
-    <section id="harness">
-      <h2>5. Harness 명령</h2>
-      <pre><code># 모든 IP 의 stage matrix
-tools/ipflow.py status
+    <!-- ─────────── Section 5: Conversion tools ─────────── -->
+    <section id="conversion-tools">
+      <h2>5. 필요한 문서 변환 도구</h2>
+      <p>현재 Word/Excel/PDF 산출물을 새 구조로 옮기기 위한 자동 변환 도구. 모두 OSS 위에 사내 후처리 1회 작성.</p>
 
-# closed-loop invariant 검사
-tools/ipflow.py validate ssd_soc/subsystems/cpu_ss/ip/irq_ctrl
+      <table class="stages-table">
+        <thead>
+          <tr>
+            <th>도구</th>
+            <th>입력 → 출력</th>
+            <th>저장소</th>
+            <th>OSS 기반</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>docx2md</code></td>
+            <td>HLD/DLD <code>.docx</code> → <code>.md</code></td>
+            <td>② Design</td>
+            <td><code>pandoc</code> + 사내 후처리 (헤딩 번호 보정, 표 정리, 이미지 추출)</td>
+          </tr>
+          <tr>
+            <td><code>xlsx2rdl</code></td>
+            <td>SFR <code>.xlsx</code> → <code>.rdl</code></td>
+            <td>③ RDL</td>
+            <td><code>openpyxl</code> + 자체 SystemRDL emitter (사내 Excel template 매핑)</td>
+          </tr>
+          <tr>
+            <td><code>pdf2md</code></td>
+            <td>NVMe/PCIe/ONFI <code>.pdf</code> → 챕터별 <code>.md</code></td>
+            <td>⑥ Spec</td>
+            <td><code>pdftotext</code> + 장/절 분리 + 표 후처리</td>
+          </tr>
+          <tr class="hl">
+            <td><code>peakrdl</code></td>
+            <td><code>.rdl</code> → IP-XACT XML · <code>HAL.h</code> · Markdown 표</td>
+            <td>③→⑤ (RDL→HAL)</td>
+            <td><code>peakrdl-ipxact</code>, <code>peakrdl-html</code>, <code>peakrdl-cheader</code></td>
+          </tr>
+          <tr>
+            <td><code>mermaid-cli</code></td>
+            <td><code>.mmd</code> source → SVG</td>
+            <td>② Design</td>
+            <td>mermaid-cli (npm)</td>
+          </tr>
+          <tr>
+            <td><code>wavedrom-cli</code></td>
+            <td>WaveDrom JSON → SVG</td>
+            <td>② Design</td>
+            <td>wavedrom-cli (npm)</td>
+          </tr>
+          <tr>
+            <td><code>confluence-export</code></td>
+            <td>Confluence 페이지 → Markdown</td>
+            <td>④ PG (initial)</td>
+            <td>Confluence REST API + pandoc</td>
+          </tr>
+          <tr>
+            <td><code>shadow-lint</code></td>
+            <td><code>@shadow:gen</code> 주석 영역 수동 편집 감지</td>
+            <td>모든 doc CI</td>
+            <td>자체 (Python · git diff parse)</td>
+          </tr>
+        </tbody>
+      </table>
 
-# scenarios.yaml 파싱 + TB task 매칭
-tools/ipflow.py scenarios ssd_soc/subsystems/cpu_ss/ip/irq_ctrl
+      <h3>예시 명령</h3>
+      <pre><code># 1) Word → Markdown (1 IP)
+$ docx2md design-repo/nvme_ctrl/HLD.docx -o design-repo/nvme_ctrl/HLD.md
+$ docx2md design-repo/nvme_ctrl/DLD.docx -o design-repo/nvme_ctrl/DLD.md
 
-# 호스트 단계 일괄: 도면 렌더 → validate → HAL smoke test
-tools/ipflow.py run ssd_soc/subsystems/cpu_ss/ip/irq_ctrl
+# 2) Excel → SystemRDL
+$ xlsx2rdl --template enterprise excel/nvme_ctrl_sfr.xlsx \
+           -o rdl-repo/nvme_ctrl/nvme_ctrl.rdl
 
-# 웹 대시보드 데이터 갱신
-tools/ipflow.py status --json &gt; web/data/status.json</code></pre>
+# 3) SystemRDL → IP-XACT + HAL.h + regmap.md (한 번에)
+$ peakrdl ipxact rdl-repo/nvme_ctrl/nvme_ctrl.rdl \
+          -o rdl-repo/nvme_ctrl/nvme_ctrl.ipxact.xml
+$ peakrdl c-header rdl-repo/nvme_ctrl/nvme_ctrl.rdl \
+          -o hal-repo/include/nvme_ctrl_hal.h
+$ peakrdl html rdl-repo/nvme_ctrl/nvme_ctrl.rdl \
+          -o design-repo/nvme_ctrl/diagrams/regmap.md
 
-      <h3>CI 통합</h3>
-      <p><code>ci/ip-ci.yml</code> 의 <code>workflow-validate</code> job 이 PR 마다 위 검사를 실행한다. 어느 invariant 라도 깨지면 PR fail.</p>
+# 4) PDF → Markdown (NVMe 2.0 표준)
+$ pdf2md --split-chapter spec-repo/pdfs/nvme-2.0.pdf \
+         -o spec-repo/extracted/nvme-2.0/
+
+# 5) shadow zone 수동 편집 감지 (PR 단계 CI)
+$ shadow-lint --check design-repo/nvme_ctrl/DLD.md
+✓ §5 register map shadow zone in sync
+✗ §5 register map shadow zone manually edited (lines 124-128) → PR blocked</code></pre>
+
+      <p class="caption" style="margin-top:14px; padding:10px 14px; background:#fff8c5; border-left:3px solid #b58900; border-radius:4px">
+        ⓘ 변환 도구 개발은 12주 컷오버의 <strong>Step 2 (W1–2)</strong> — 신뢰성 80%+ 가 1주 안에 확보돼야 이후 Bulk 변환 (Step 3) 이 흐를 수 있다.
+        Critical path 의 첫 번째 노드.
+        <a href="report/#07-roadmap" style="font-weight:600">📘 §7 로드맵</a> ·
+        <a href="present/#12">▶ 슬라이드 12</a>
+      </p>
     </section>
   </main>
 
   <footer>
     <div class="container">
-      <small>Generated by <code>tools/ipflow.py</code>. Source: <a href="https://github.com/k31001/ssd-soc-cfg-mngt">k31001/ssd-soc-cfg-mngt</a>. 자세한 정의는 <a href="https://github.com/k31001/ssd-soc-cfg-mngt/blob/main/docs/WORKFLOW.md"><code>docs/WORKFLOW.md</code></a>.</small>
+      <small>Source: <a href="https://github.com/k31001/ssd-soc-cfg-mngt">k31001/ssd-soc-cfg-mngt</a> · <a href="report/">📘 제안 보고서 (9 챕터)</a> · <a href="present/">▶ 발표 슬라이드 (13장)</a> · 9-stage 워크플로우 정의는 <a href="https://github.com/k31001/ssd-soc-cfg-mngt/blob/main/docs/WORKFLOW.md"><code>docs/WORKFLOW.md</code></a>.</small>
     </div>
   </footer>
 
-  <script src="app.js"></script>
   <script>
     mermaid.initialize({ startOnLoad: true, securityLevel: "loose", flowchart: { htmlLabels: true } });
   </script>
