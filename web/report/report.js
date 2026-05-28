@@ -13,31 +13,25 @@ const CHAPTERS = [
   '04-rtl-doc-consistency',
   '05-ai-automation',
   '06-workflow-e2e',
-  '07-llmwiki-benchmark',
-  '08-quantitative-impact',
-  '09-risks-migration',
-  '10-roadmap',
-  '11-conclusion',
+  '07-roadmap',
+  '08-conclusion',
 ];
 
 const TITLES = {
   'README': '표지 / 목차',
   '00-executive-summary': '00 — Executive Summary',
   '01-problem': '01 — 문제 정의',
-  '02-proposal': '02 — 제안 (3-repo 아키텍처)',
-  '03-artifact-taxonomy': '03 — 산출물 5종 분류',
-  '04-rtl-doc-consistency': '04 — 정합성 CI (D/F invariants)',
-  '05-ai-automation': '05 — AI 자동화',
-  '06-workflow-e2e': '06 — End-to-End 워크플로우',
-  '07-llmwiki-benchmark': '07 — LLM Wiki / DeepWiki 비교',
-  '08-quantitative-impact': '08 — 정량 효과',
-  '09-risks-migration': '09 — 리스크 · 마이그레이션',
-  '10-roadmap': '10 — 로드맵',
-  '11-conclusion': '11 — 결론',
+  '02-proposal': '02 — 아키텍처 (8-repo)',
+  '03-artifact-taxonomy': '03 — 산출물 분류 + 시각화',
+  '04-rtl-doc-consistency': '04 — CI Invariants + Hybrid Zone',
+  '05-ai-automation': '05 — AI 자동화 (Claude dev-verifier)',
+  '06-workflow-e2e': '06 — Phase 1/2 전파',
+  '07-roadmap': '07 — 로드맵 + 리스크',
+  '08-conclusion': '08 — 결론',
 };
 
 const PRESETS = {
-  exec: ['00-executive-summary', '02-proposal', '08-quantitative-impact', '11-conclusion'],
+  exec: ['00-executive-summary', '07-roadmap', '08-conclusion'],
   rtl:  ['01-problem', '02-proposal', '04-rtl-doc-consistency', '06-workflow-e2e'],
   sw:   ['03-artifact-taxonomy', '05-ai-automation', '06-workflow-e2e'],
 };

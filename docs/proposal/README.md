@@ -1,66 +1,50 @@
 # AI 친화 SoC 산출물 관리 — 제안 보고서
 
-본 디렉터리는 SoC 설계·검증 프로세스를 AI 기반으로 전환하기 위한
-**산출물 관리 전략 제안서**의 본문이다. 임원/리더 및 실무자 혼합
-청중을 대상으로 한다.
-
 ## 한 줄 명제
 
-> **모든 산출물은 마크다운으로 작성하여 git에 둔다. 문서 저장소는
-> submodule로 직접 연결하고, RTL을 single source of truth로 삼아
-> 정합성을 CI가 강제한다.**
+> **모든 산출물은 Markdown·SystemRDL 로 작성해 8개 git 저장소에 둔다. Claude Code 가 Phase 1/2 로 RTL 변경을 전파하고, CI invariant 가 정합성을 강제한다.**
 
----
+## 9 챕터 목차
 
-## 챕터 목차
-
-| # | 챕터 | 핵심 질문 |
+| # | 챕터 | 1줄 요약 |
 |---|---|---|
-| [00](00-executive-summary.md) | Executive Summary | 한 장으로 본 제안의 전부 |
-| [01](01-problem.md) | 문제 정의 | 기존 Confluence/RAG/MCP의 3대 비효율 |
-| [02](02-proposal.md) | 제안 | Markdown · Git · Submodule · RTL-Grounded 통합 워크플로우 |
-| [03](03-artifact-taxonomy.md) | 산출물 5종 분류 | HLD / DLD / Programmer's Guide / SFR / HAL과 Diátaxis 매핑 |
-| [04](04-rtl-doc-consistency.md) | 정합성 CI | 6 invariant로 정합성을 빌드 시스템에 위임 |
-| [05](05-ai-automation.md) | AI 자동화 | 4가지 자동 생성 시나리오와 submodule 직접 read |
-| [06](06-workflow-e2e.md) | End-to-End 워크플로우 | Base SoC → 신규 SoC 8단계 |
-| [07](07-llmwiki-benchmark.md) | LLM Wiki / DeepWiki 벤치마크 | 6개 산업 트렌드와의 비교 |
-| [08](08-quantitative-impact.md) | 정량 효과 | 산업 평균 기준 ROI 추정 |
-| [09](09-risks-migration.md) | 리스크와 마이그레이션 | 3-lane 점진적 이행 |
-| [10](10-roadmap.md) | 로드맵 | 3개월(12주) 일제 전환 step-by-step |
-| [11](11-conclusion.md) | 결론 | 3개월 후 도달하는 모습 · 기회비용 |
+| [00](00-executive-summary.md) | Executive Summary | 1페이지 요약 + 정량 효과 + 12주 컷오버 |
+| [01](01-problem.md) | 문제 정의 | Word/Excel/Confluence/RAG/MCP 의 3대 비효율 |
+| [02](02-proposal.md) | 아키텍처 | 8-repo · Phase 1/2 · 4 빌딩블록 |
+| [03](03-artifact-taxonomy.md) | 산출물 분류 | 5종 문서 + 3종 코드 + 1종 외부 + 마크다운 시각화 |
+| [04](04-rtl-doc-consistency.md) | CI invariants | Authored/Shadow Zone + 저장소별 invariant 매트릭스 |
+| [05](05-ai-automation.md) | AI 자동화 | Claude dev-verifier + 참조 위계 + Spec PDF 결정 |
+| [06](06-workflow-e2e.md) | Phase 1/2 전파 | RTL 변경의 1주 흐름 (Phase 1 + Phase 2) |
+| [07](07-roadmap.md) | 로드맵 + 리스크 | 3개월(12주) 일제 전환 step-by-step + Top 5 리스크 |
+| [08](08-conclusion.md) | 결론 | Day 90 도달 상태 + 기회비용 |
 
-## 부속 자료
+## 부속
 
-- [`_research-notes.md`](_research-notes.md) — 외부 1차 자료 인용 원본 (작업용 부록)
-- 발표용 웹앱: [`../../web/present/`](../../web/present/)
-- 본 워크플로우의 라이브 대시보드: [`../../web/`](../../web/) (Stage matrix · invariant status)
+- [`_research-notes.md`](_research-notes.md) — 외부 1차 자료 인용 부록
+- 발표 슬라이드: [`../../web/present/`](../../web/present/index.html)
+- 라이브 대시보드: [`../../web/`](../../web/) (9-stage concept proof + 25×8 status matrix)
 - 운영 워크플로우 정의: [`../WORKFLOW.md`](../WORKFLOW.md)
 - 실증 보고: [`../VERIFICATION_REPORT.md`](../VERIFICATION_REPORT.md)
 - 형상관리 4전략 비교: [`../../cm-strategies/README.md`](../../cm-strategies/README.md)
 
----
+## 청중별 권장 읽기 순서
 
-## 빠른 진입 — 청중별 권장 읽기 순서
-
-### 임원 / 사업부장 (15분)
+### 임원·사업부장 (10분)
 1. [00 Executive Summary](00-executive-summary.md)
-2. [02 제안 §2.4 Before/After](02-proposal.md#24-무엇이-달라지는가--before--after-한눈에)
-3. [08 정량 효과 §8.8 ROI 요약](08-quantitative-impact.md#88-roi-요약-day-90-시점)
-4. [10 로드맵 — 3개월 일제 전환](10-roadmap.md)
-5. [11 결론 §11.1 3개월 후 모습](11-conclusion.md#111-3개월-후-도달하는-모습)
+2. [07 Roadmap §7.3 12주 step-by-step](07-roadmap.md#73-12주-step-by-step)
+3. [08 Day 90 도달 상태](08-conclusion.md#82-day-90-도달-상태)
 
-### SoC 실무자 / RTL designer (45분)
-1. [01 문제 정의](01-problem.md)
-2. [02 제안](02-proposal.md)
-3. [04 정합성 CI](04-rtl-doc-consistency.md)
-4. [06 End-to-End 워크플로우](06-workflow-e2e.md)
+### SoC 실무자 (30분)
+1. [01 문제](01-problem.md) · [02 아키텍처](02-proposal.md)
+2. [04 CI invariants](04-rtl-doc-consistency.md)
+3. [06 Phase 1/2 전파](06-workflow-e2e.md)
 
-### SW / DV 엔지니어 (30분)
-1. [03 산출물 5종 분류](03-artifact-taxonomy.md)
+### SW · DV · FW 엔지니어 (25분)
+1. [03 산출물 분류](03-artifact-taxonomy.md)
 2. [05 AI 자동화](05-ai-automation.md)
-3. [06 End-to-End 워크플로우](06-workflow-e2e.md)
+3. [06 Phase 1/2 전파](06-workflow-e2e.md)
 
-### DevOps / Infra (30분)
-1. [04 정합성 CI](04-rtl-doc-consistency.md)
-2. [09 리스크와 마이그레이션](09-risks-migration.md)
-3. [10 로드맵](10-roadmap.md)
+### DevOps · Infra (25분)
+1. [02 아키텍처 §2.2 저장소 카드](02-proposal.md)
+2. [04 CI invariants](04-rtl-doc-consistency.md)
+3. [07 로드맵 + 리스크](07-roadmap.md)
