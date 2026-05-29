@@ -190,81 +190,140 @@ flowchart TD
       </table>
     </section>
 
-    <!-- ─────────── Section 3: Repository structure ─────────── -->
+    <!-- ─────────── Section 3: Repository types & managed data ─────────── -->
     <section id="repo-structure">
-      <h2>3. 저장소 구조 — 8개 repo 의 디렉터리 한눈에</h2>
-      <p>모든 산출물은 정해진 위치에 산다. Claude Code 가 컨텍스트를 모을 때 모호함이 없도록 디렉터리 컨벤션이 표준화되어 있다.</p>
+      <h2>3. 저장소 종류 — 무엇을 어디서 관리하나</h2>
+      <p>8 repo 를 <strong>4가지 종류</strong> (Source · Document · Code · External Reference) 로 분류한다. 각 저장소는 종류별로 다른 갱신 트리거·소비자·릴리스 주기를 갖는다.</p>
 
-      <pre><code>┌─ ① rtl-repo/ ─────────────────────────────────┐
-│  rtl/&lt;ip&gt;/*.sv               # Verilog RTL    │
-│  lint/                       # Verible 룰      │
-│  scripts/synth.tcl           # 합성 스크립트    │
-└────────────────────────────────────────────────┘
+      <h3>① Source 저장소 — RTL</h3>
+      <table class="stages-table">
+        <thead><tr><th>Repo</th><th>관리 데이터</th><th>포맷</th><th>갱신 트리거</th><th>소비자</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>① RTL</strong></td>
+            <td>Verilog RTL 소스 (IP 단위), lint 룰, 합성 스크립트</td>
+            <td><code>.sv</code> · <code>.f</code> · <code>.tcl</code></td>
+            <td>RTL designer 가 새 기능·버그픽스 commit</td>
+            <td>합성/에뮬레이션 인프라 · Design CI fetch · RDL CI fetch</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="caption">모든 산출물의 <strong>single source of truth</strong>. 다른 저장소가 fetch 만 한다 (어디의 submodule 도 아님).</p>
 
-┌─ ② design-repo/ ──────────────────────────────┐
-│  &lt;ip&gt;/HLD.md                                  │
-│  &lt;ip&gt;/DLD.md                                  │
-│      ├─ §1-4 (사람 authored)                  │
-│      └─ §5 regmap  ←@shadow:gen (RTL→auto)    │
-│  &lt;ip&gt;/diagrams/                               │
-│      ├─ *.json    (Mermaid·WaveDrom source)   │
-│      └─ *.svg     (auto-render)               │
-└────────────────────────────────────────────────┘
+      <h3>② Document 저장소 (3개) — SW-HW 계약 + 설계 의도</h3>
+      <table class="stages-table">
+        <thead><tr><th>Repo</th><th>관리 데이터</th><th>포맷</th><th>갱신 트리거</th><th>소비자</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>② Design</strong></td>
+            <td>HLD (IP 개념·블록도·외부 인터페이스) + DLD (FSM·timing·port table·register map)</td>
+            <td>Markdown + Mermaid + WaveDrom</td>
+            <td>RTL 변경 시 §5 regmap shadow auto-sync · 사람이 §1-4 의도 보강</td>
+            <td>PG · FW · Test (submodule)</td>
+          </tr>
+          <tr>
+            <td><strong>③ RDL</strong></td>
+            <td>레지스터·필드 사양 (offset·width·access·reset·desc) + peakrdl 자동 산출물</td>
+            <td>SystemRDL <code>.rdl</code> + IP-XACT 1685-2022 <code>.xml</code></td>
+            <td>RTL register 변경 시 shadow auto-sync · 사람이 <code>field desc</code> 보강</td>
+            <td>HAL (peakrdl emit) · PG · FW · Test (submodule)</td>
+          </tr>
+          <tr class="hl">
+            <td><strong>④ PG</strong></td>
+            <td><strong>SW-HW 계약</strong> — 초기화 시퀀스, 모드, ISR flow, worked example, pitfall</td>
+            <td>Markdown</td>
+            <td>SW lead 가 새 기능에 대한 SW 사용법 정의 시 작성</td>
+            <td>HAL (참조) · FW · Test (submodule)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="caption">3개 저장소로 분리한 이유: 작성자 (Architect/RTL/SW lead) · 갱신 빈도 · 소비 패턴이 모두 다름. 한 저장소면 한 사람의 PR 이 다른 사람을 자주 conflict.</p>
 
-┌─ ③ rdl-repo/ ─────────────────────────────────┐
-│  &lt;ip&gt;/&lt;ip&gt;.rdl              # SystemRDL author │
-│      ├─ offset·width  ←@shadow:gen            │
-│      └─ field desc (사람)                      │
-│  &lt;ip&gt;/&lt;ip&gt;.ipxact.xml       # peakrdl auto    │
-└────────────────────────────────────────────────┘
+      <h3>③ Code 저장소 (3개) — 실행 가능한 산출물</h3>
+      <table class="stages-table">
+        <thead><tr><th>Repo</th><th>관리 데이터</th><th>포맷</th><th>갱신 트리거</th><th>소비자</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>⑤ HAL</strong></td>
+            <td>HAL 헤더 (RDL → peakrdl auto-gen) + HAL 구현체 (Claude 작성, 사람 검토)</td>
+            <td>C 헤더 + C source + Doxygen</td>
+            <td>RDL 변경 시 헤더 자동 재생성 · PG 변경 시 Claude 가 HAL.c 패치</td>
+            <td>FW (submodule) · 사내 다른 펌웨어 프로젝트</td>
+          </tr>
+          <tr>
+            <td><strong>⑦ FW</strong></td>
+            <td>SSD Controller 펌웨어 — driver, app, ISR, DMA, 락 정책</td>
+            <td>C source + 빌드 시스템 (Make/CMake)</td>
+            <td>FW 기능 추가 · doc submodule tag 갱신 시 Claude 가 패치</td>
+            <td>FPGA · Veloce · Zebu (FW binary load)</td>
+          </tr>
+          <tr>
+            <td><strong>⑧ Test</strong></td>
+            <td>Python coverif scenarios (sc_*.py = worked example, regress_*.py = pitfall) + NVMe/PCIe host helper</td>
+            <td>Python (pytest)</td>
+            <td>PG §6/§8 변경 시 Claude 가 시나리오 생성 · DV 가 측정·assertion 보강</td>
+            <td>SSD Host (Linux 서버, NVMe 드라이버) → FPGA·Veloce·Zebu 구동</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="caption">HAL 별도 분리: 사내 다른 펌웨어 프로젝트도 HAL 만 끌어다 쓸 수 있게. FW 와 Test 분리: 실행 환경·언어·툴체인이 다름 (FW=C on SoC, Test=Python on Host).</p>
 
-┌─ ④ pg-repo/ ──────────────────────────────────┐
-│  &lt;ip&gt;/PROGRAMMERS_GUIDE.md                    │
-│      ├─ §1-5 개념·시퀀스 (사람)                │
-│      ├─ §6 worked example (사람 + Claude 초안) │
-│      │   └─ 시그너처 부분 ←@shadow:gen         │
-│      └─ §8 pitfall (incident log 추출)         │
-└────────────────────────────────────────────────┘
+      <h3>④ External Reference 저장소 — 표준 spec</h3>
+      <table class="stages-table">
+        <thead><tr><th>Repo</th><th>관리 데이터</th><th>포맷</th><th>갱신 트리거</th><th>소비자</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>⑥ Spec</strong></td>
+            <td>NVMe · PCIe · ONFI 등 표준 spec 원본 PDF + 자동 추출 Markdown + 섹션 인덱스</td>
+            <td>PDF (git LFS) + chapter별 <code>.md</code> + <code>index.json</code></td>
+            <td>표준 새 버전 출시 시 (수년 주기) Standards 담당이 import</td>
+            <td>FW · Test (submodule, Claude 가 grep on-demand)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="caption">원본 PDF 는 법적 reference (LFS 보관). 자동 MD extract 가 AI-friendly 형태 — Claude 가 필요한 챕터만 grep 으로 on-demand 접근.</p>
 
-┌─ ⑤ hal-repo/ ─────────────────────────────────┐
-│  include/&lt;ip&gt;_hal.h          # peakrdl auto   │
-│  src/&lt;ip&gt;_hal.c              # Claude 작성    │
-│  tests/host/                 # host smoke test │
-│  rdl/                        # submodule (RDL) │
-└────────────────────────────────────────────────┘
-
-┌─ ⑥ spec-repo/ ────────────────────────────────┐
-│  pdfs/nvme-2.0.pdf           # git LFS         │
-│  pdfs/pcie-5.0-base.pdf      # git LFS         │
-│  extracted/&lt;spec&gt;/ch*.md     # auto MD extract │
-│  index.json                  # 섹션 인덱스      │
-└────────────────────────────────────────────────┘
-
-┌─ ⑦ fw-repo/ ──────────────────────────────────┐
-│  fw/drivers/                                  │
-│  fw/app/                                      │
-│  doc/    ← submodules                         │
-│     ├─ design/   (Design Repo)                │
-│     ├─ rdl/      (RDL Repo)                   │
-│     ├─ pg/       (PG Repo)                    │
-│     ├─ hal/      (HAL Repo)                   │
-│     └─ spec/     (Spec Repo)                  │
-│  Makefile                                     │
-└────────────────────────────────────────────────┘
-
-┌─ ⑧ test-repo/ ────────────────────────────────┐
-│  tests/scenarios/&lt;ip&gt;/sc_*.py    # worked     │
-│  tests/scenarios/&lt;ip&gt;/regress_*.py # pitfall  │
-│  tests/lib/nvme_host.py                       │
-│  doc/    ← submodules                         │
-│     ├─ design/  ├─ rdl/                       │
-│     ├─ pg/      └─ spec/                      │
-│  pytest.ini                                   │
-└────────────────────────────────────────────────┘</code></pre>
-
+      <h3>저장소 간 데이터 흐름 요약</h3>
+      <div class="mermaid">
+flowchart LR
+    subgraph SRC["Source"]
+      R1["① RTL"]
+    end
+    subgraph DOCS["Document (3)"]
+      direction TB
+      R2["② Design"]
+      R3["③ RDL"]
+      R4["④ PG"]
+    end
+    subgraph CODE["Code (3)"]
+      direction TB
+      R5["⑤ HAL"]
+      R6["⑦ FW"]
+      R7["⑧ Test"]
+    end
+    subgraph EXT["External Ref"]
+      R8["⑥ Spec"]
+    end
+    R1 ==>|RTL fetch| R2
+    R1 ==>|RTL fetch| R3
+    R2 -.ref.-> R4
+    R3 -.ref.-> R4
+    R3 ==>|peakrdl| R5
+    R4 -.ref.-> R5
+    R2 -.submodule.- R6
+    R3 -.submodule.- R6
+    R4 -.submodule.- R6
+    R5 -.submodule.- R6
+    R8 -.submodule.- R6
+    R2 -.submodule.- R7
+    R3 -.submodule.- R7
+    R4 -.submodule.- R7
+    R8 -.submodule.- R7
+      </div>
       <p class="caption">
-        Submodule 디렉터리 명 (<code>doc/design/</code>, <code>doc/rdl/</code> 등) 은 prompt 컨벤션과 직결.
-        Claude 의 시스템 프롬프트가 이 path 를 그대로 지시한다.
+        실선 (==>) = 데이터 변환 (fetch + 자동 생성).
+        점선 (─.─) = submodule pin (의존성).
+        <strong>RTL 은 어디의 submodule 도 아님</strong> — fetch 만. <strong>Test 는 HAL submodule 안 함</strong> (Python 은 C HAL 과 링크하지 않음).
       </p>
     </section>
 
